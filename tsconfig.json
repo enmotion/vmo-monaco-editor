@@ -33,7 +33,7 @@
        "@lib/*": ["use.lib/*"], // 两个都需要....
      }
   },
-  "include": ["index.ts", "src/**/*.ts", "src/**/*.tsx", "src/**/*.vue", "types/**/*.ts", "use.lib/**/*.ts", "components/**/*.ts", "components/**/*.tsx", "components/**/*.vue"],
+  "include": ["index.ts", "src/**/*.ts", "src/**/*.tsx", "src/**/*.vue", "types/**/*.ts", "use.lib/**/*.ts", "components/**/*.ts", "components/**/*.tsx", "components/**/*.vue", "use.lib/monaco-editor-inti.ts"],
   "exclude": ["src/main.ts", "src/config/index.ts","src/vite-env.d.ts"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }
