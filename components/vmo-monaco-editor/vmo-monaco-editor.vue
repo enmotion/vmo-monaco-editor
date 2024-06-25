@@ -1,21 +1,11 @@
 <template>
-  <div class="bg-white w-[800px] flex-col flex p-[10px]">
-    <div ref="MonacoEditorRef" class="h-full"></div>
+  <div class="bg-white w-[800px] flex-col flex p-[20px]">
+    <div ref="MonacoEditorRef" class="flex-grow h-0 border"></div>
   </div>
 </template>
 
 <script lang="ts">
-import {
-  defineComponent,
-  ref,
-  shallowRef,
-  computed,
-  onBeforeUnmount,
-  onMounted,
-  nextTick,
-  watch,
-  getCurrentInstance
-} from 'vue'
+import { defineComponent, ref, shallowRef, computed, onBeforeUnmount, onMounted, nextTick, watch, getCurrentInstance} from 'vue'
 import 'monaco-editor/esm/vs/basic-languages/css/css.contribution'
 import 'monaco-editor/esm/vs/basic-languages/xml/xml.contribution'
 import 'monaco-editor/esm/vs/basic-languages/javascript/javascript.contribution'
@@ -25,7 +15,6 @@ import * as Monaco from 'monaco-editor'
 // import { useFormItem } from 'element-plus'
 // import MonacoUiBoard from './widgets/monaco-ui-board.vue'
 // import { useGenerateUiOptions } from './use.lib/'
-
 import EditorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker'
 import TsWorker from 'monaco-editor/esm/vs/language/typescript/ts.worker?worker'
 import JsonWorker from 'monaco-editor/esm/vs/language/json/json.worker?worker'
