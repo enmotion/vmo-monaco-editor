@@ -1,17 +1,19 @@
 <script setup lang="ts">
-import { VmoButton } from "../index"
+import { vmoMonacoEditor } from '../index'
 </script>
 
 <template>
-  <div class="flex flex-col flex-grow items-center justify-center">
-    <vmo-button perfix="ssee">aaaa</vmo-button>
+  <div class="flex flex-row grow-1 h-full">
+    <div class="flex-col flex flex-grow w-0 bg-white border">cc</div>
+    <vmo-monaco-editor></vmo-monaco-editor>
   </div>
 </template>
 
 <style>
-html,body{
-    height: 100%;
-    display: flex;
-    flex-grow: 1;
+html,
+body {
+  height: 100%;
+  display: flex;
+  flex-grow: 1;
 }
 </style>

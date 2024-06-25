@@ -1,6 +1,2 @@
-import VmoButton from "@comps/vmo-button/vmo-button.vue";
-import type { ButtonParams } from "@comps/vmo-button/types";
-export {
-  VmoButton,
-  ButtonParams
-}
+import vmoMonacoEditor from '@comps/vmo-monaco-editor/vmo-monaco-editor.vue'
+export { vmoMonacoEditor }
