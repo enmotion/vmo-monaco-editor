@@ -43,7 +43,7 @@
     "components/**/*.ts",
     "components/**/*.tsx",
     "components/**/*.vue",
-    "use.lib/monaco-editor-inti.js"
+    "use.lib/monaco-editor-inti.ts"
   ],
   "exclude": ["src/main.ts", "src/config/index.ts", "src/vite-env.d.ts"],
   "references": [{ "path": "./tsconfig.node.json" }]
