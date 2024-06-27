@@ -84,7 +84,6 @@ export default defineComponent({
   },
   emits: ['change', 'update:modelValue', 'focuse', 'blur'],
   setup(props, context) {
-    initMonacoEnvironment()
     const timer = ref(null as any)
     const innerValue = ref('')
     const MonacoEditorRef = shallowRef(null as any)

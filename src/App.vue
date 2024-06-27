@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { vmoMonacoEditor } from '../index'
+import { vmoMonacoEditor, initMonacoEnvironment } from '../index'
+initMonacoEnvironment()
 const codeContent = ref('const s =12;\nfunction aa(a:number){ return a;}')
 </script>
 

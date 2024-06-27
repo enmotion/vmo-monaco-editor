@@ -1,2 +1,3 @@
 import vmoMonacoEditor from '@comps/vmo-monaco-editor/vmo-monaco-editor.vue'
-export { vmoMonacoEditor }
+import { initMonacoEnvironment } from '@lib/monaco-editor-inti'
+export { vmoMonacoEditor, initMonacoEnvironment }
