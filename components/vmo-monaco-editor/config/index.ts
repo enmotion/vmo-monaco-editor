@@ -1,6 +1,7 @@
 import type Monaco from 'monaco-editor'
 
 export const vmoMonacoEditorDefaultOption: Partial<Monaco.editor.IStandaloneEditorConstructionOptions> = {
+  automaticLayout: true, // 是否自动适应容器高宽
   theme: 'vs-dark',
-  automaticLayout: true // 是否自动适应容器高宽
+  language: 'typescript'
 }

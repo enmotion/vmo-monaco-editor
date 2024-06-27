@@ -10,7 +10,14 @@ const codeContent = ref('')
     <div class="flex-col flex flex-grow w-0 bg-white border p-[10px]">
       <input v-model="codeContent" />
     </div>
-    <vmo-monaco-editor :model-value="codeContent" :prefix="codeContent" class="w-[800px]"></vmo-monaco-editor>
+    <vmo-monaco-editor
+      :model-value="codeContent"
+      prefix="function(name){"
+      :option-config="{
+        theme: 'vs-dark'
+      }"
+      class="w-[800px]">
+    </vmo-monaco-editor>
   </div>
 </template>
 

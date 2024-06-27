@@ -35,7 +35,7 @@
 </style>
 
 <script lang="ts">
-import { defineComponent, shallowRef, onMounted, watch, computed } from 'vue'
+import { defineComponent, ref, shallowRef, onMounted, watch, computed } from 'vue'
 import 'monaco-editor/esm/vs/basic-languages/css/css.contribution'
 import 'monaco-editor/esm/vs/basic-languages/xml/xml.contribution'
 import 'monaco-editor/esm/vs/basic-languages/javascript/javascript.contribution'
@@ -73,21 +73,27 @@ export default defineComponent({
     }
   },
   setup(props, context) {
+    const innerValue = ref('')
     const MonacoEditorRef = shallowRef(null as any)
     const monacoEditorInstance = shallowRef(null as null | Monaco.editor.IStandaloneCodeEditor)
     const computedMonacoEditorOption = computed(() => {
-      return mergeDeepRight(vmoMonacoEditorDefaultOption, {
-        theme: 'vs-light',
-        language: 'typescript'
-      })
+      return mergeDeepRight(vmoMonacoEditorDefaultOption, props.optionConfig)
     })
+    watch(
+      () => computedMonacoEditorOption.value,
+      n => {
+        if (n) {
+          initMonacoEditor(innerValue.value)
+        }
+      }
+    )
     // 当外部内容属性变化时，及时更新内部的编辑内容
     watch(
       () => props.modelValue,
       n => {
         if (!!n) {
           if (!!monacoEditorInstance.value) {
-            monacoEditorInstance.value?.setValue(n)
+            initMonacoEditor(n)
           } else {
             initMonacoEditor(n)
           }
@@ -100,6 +106,7 @@ export default defineComponent({
     })
     // 初始化
     function initMonacoEditor(codeValue: string) {
+      innerValue.value = codeValue
       monacoEditorInstance.value?.dispose()
       monacoEditorInstance.value = Monaco.editor.create(
         MonacoEditorRef.value,
