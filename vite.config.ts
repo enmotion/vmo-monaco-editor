@@ -20,21 +20,13 @@ export default defineConfig({
     },
     sourcemap: false,
     rollupOptions: {
-      external: ['vue','monaco-editor','ramda'],
+      external: ['vue', 'monaco-editor', 'ramda', /^monaco-editor/],
       output: {
         globals: {
           vue: 'vue',
-          'monaco-editor':'monaco-editor',
-          'ramda':'ramda'
-        },
-        // 手动添加 MonacoEditor所需资源 打包
-        // manualChunks: {
-        //   jsonWorker: [`${prefix}/language/json/json.worker`],
-        //   cssWorker: [`${prefix}/language/css/css.worker`],
-        //   htmlWorker: [`${prefix}/language/html/html.worker`],
-        //   tsWorker: [`${prefix}/language/typescript/ts.worker`],
-        //   editorWorker: [`${prefix}/editor/editor.worker`]
-        // }
+          'monaco-editor': 'monaco-editor',
+          ramda: 'ramda'
+        }
       }
     }
   },
