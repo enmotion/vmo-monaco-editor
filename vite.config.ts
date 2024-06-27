@@ -3,9 +3,11 @@ import { resolve } from 'node:path'
 import vue from '@vitejs/plugin-vue'
 import dts from 'vite-plugin-dts'
 // const prefix = `monaco-editor/esm/vs` // 声明 MonacoEditor 静态文件打包前缀地址
-
 // https://vitejs.dev/config/
 export default defineConfig({
+  define: {
+    __VUE_PROD_HYDRATION_MISMATCH_DETAILS__: false
+  },
   plugins: [vue(), dts({ copyDtsFiles: true })],
   server: {
     host: '0.0.0.0',

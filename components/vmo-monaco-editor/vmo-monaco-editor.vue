@@ -53,7 +53,7 @@ import { vmoMonacoEditorDefaultOption } from './config'
 // import MonacoUiBoard from './widgets/monaco-ui-board.vue'
 // import { useGenerateUiOptions } from './use.lib/'
 import { initMonacoEnvironment } from '@lib/monaco-editor-inti'
-
+initMonacoEnvironment()
 export default defineComponent({
   name: 'vmo-monaco-editor',
   inheritAttrs: false,
