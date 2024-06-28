@@ -98,7 +98,7 @@ props:{
     type: Boolean as PropType<boolean>,
     default: false
   },
-  optionConfig: {
+  monacoOptions: {
     // monaco-editor 配置
     type: Object as PropType<
       Partial<Monaco.editor.IStandaloneEditorConstructionOptions & { theme: 'vs-dark' | 'vs-light' }>

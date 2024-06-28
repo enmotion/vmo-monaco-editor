@@ -53,19 +53,20 @@ const vmoMonacoEditorInstance = ref(null as any)
       <textarea v-model="codeContent" class="border h-[200px]" :rows="4" />
     </div>
     <div class="flex-col flex bg-red-100">
-      <vmo-monaco-ui :monaco="vmoMonacoEditorInstance"></vmo-monaco-ui>
       <vmo-monaco-editor
         ref="vmoMonacoEditorInstance"
         :model-value="codeContent"
         prefix="function(name){"
         suffix="};"
-        :option-config="{
+        :monaco-options="{
           theme: 'vs-dark',
           language: 'sql'
         }"
+        :need-confirm="true"
         class="w-[800px] flex-grow"
         @update:modeValue="codeContent = $event"
         @change="codeContent = $event">
+        <vmo-monaco-ui :monaco="vmoMonacoEditorInstance"></vmo-monaco-ui>
       </vmo-monaco-editor>
     </div>
   </div>

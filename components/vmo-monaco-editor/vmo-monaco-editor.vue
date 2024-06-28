@@ -1,28 +1,35 @@
 <template>
-  <div
-    :class="[
-      context.attrs.class,
-      'vmo-monaco-editor-container',
-      computedMonacoEditorOption.theme == 'vs-dark' ? 'dark' : 'light'
-    ]"
-    :style="((context.attrs.style||{}) as StyleValue)">
-    <slot v-if="!!prefix || context.slots.prefix" name="prefix" :option="computedMonacoEditorOption">
-      <div :class="['prefix']">
-        <span v-html="prefix" class="extra-code"></span>
-      </div>
-    </slot>
-    <div ref="MonacoEditorRef" class="ide-container"></div>
-    <slot v-if="!!suffix || context.slots.prefix" name="suffix" :option="computedMonacoEditorOption">
-      <div :class="['suffix']">
-        <span v-html="suffix" class="extra-code"></span>
-      </div>
-    </slot>
-  </div>
+  <Teleport to="body" :disabled="!isFullScreen">
+    <div
+      :class="[
+        context.attrs.class,
+        'vmo-monaco-editor-container',
+        computedMonacoEditorOption.theme == 'vs-dark' ? 'dark' : 'light',
+        isFullScreen ? 'isFullScreen' : ''
+      ]"
+      :style="((context.attrs.style||{}) as StyleValue)">
+      <slot v-if="context.slots.default"></slot>
+      <slot v-if="!!prefix || context.slots.prefix" name="prefix" :option="computedMonacoEditorOption">
+        <div :class="['prefix']">
+          <span v-html="prefix" class="extra-code"></span>
+        </div>
+      </slot>
+      <div ref="MonacoEditorRef" class="ide-container"></div>
+      <slot v-if="!!suffix || context.slots.prefix" name="suffix" :option="computedMonacoEditorOption">
+        <div :class="['suffix']">
+          <span v-html="suffix" class="extra-code"></span>
+        </div>
+      </slot>
+    </div>
+  </Teleport>
 </template>
 
 <style lang="css">
 .vmo-monaco-editor-container {
   @apply flex-col flex;
+}
+.vmo-monaco-editor-container.isFullScreen {
+  @apply !w-full !h-full z-10 absolute;
 }
 .vmo-monaco-editor-container.dark,
 .vmo-monaco-editor-container.dark {
@@ -37,7 +44,7 @@
   @apply flex-row items-center flex text-xs px-[28px] py-[10px];
 }
 .vmo-monaco-editor-container .extra-code {
-  @apply flex-grow w-0 flex flex-row overflow-hidden text-ellipsis;
+  @apply flex-grow w-0 flex flex-row overflow-hidden text-ellipsis select-all;
 }
 .vmo-monaco-editor-container .ide-container {
   @apply flex flex-col h-0 flex-grow;
@@ -45,12 +52,12 @@
 </style>
 
 <script lang="ts">
-import { defineComponent, ref, shallowRef, onMounted, watch, computed, readonly } from 'vue'
+import { defineComponent, ref, shallowRef, onMounted, watch, computed, readonly, nextTick } from 'vue'
+import { mergeDeepRight } from 'ramda'
 import 'monaco-editor/esm/vs/basic-languages/css/css.contribution'
 import 'monaco-editor/esm/vs/basic-languages/xml/xml.contribution'
 import 'monaco-editor/esm/vs/basic-languages/javascript/javascript.contribution'
 import type { PropType, StyleValue } from 'vue'
-import { mergeDeepRight, clone } from 'ramda'
 import * as Monaco from 'monaco-editor'
 import { vmoMonacoEditorDefaultOption } from './config'
 
@@ -78,7 +85,11 @@ export default defineComponent({
       type: Boolean as PropType<boolean>,
       default: false
     },
-    optionConfig: {
+    bidibind: {
+      type: Boolean as PropType<boolean>,
+      default: true
+    },
+    monacoOptions: {
       // monaco-editor 配置
       type: Object as PropType<
         Partial<Monaco.editor.IStandaloneEditorConstructionOptions & { theme: 'vs-dark' | 'vs-light' }>
@@ -88,13 +99,26 @@ export default defineComponent({
   },
   emits: ['change', 'update:modelValue', 'focuse', 'blur'],
   setup(props, context) {
-    const timer = ref(null as any)
+    const isFullScreen = ref(true as any)
     const innerValue = ref('')
     const MonacoEditorRef = shallowRef(null as any)
     const monacoEditorInstance = shallowRef(null as null | Monaco.editor.IStandaloneCodeEditor)
+    const monacoEditorOptions = ref(
+      {} as Partial<Monaco.editor.IStandaloneEditorConstructionOptions & { theme: 'vs-dark' | 'vs-light' }>
+    )
     const computedMonacoEditorOption = computed(() => {
-      return JSON.parse(JSON.stringify(mergeDeepRight(vmoMonacoEditorDefaultOption, props.optionConfig)))
+      monacoEditorOptions.value
+      return JSON.parse(JSON.stringify(mergeDeepRight(vmoMonacoEditorDefaultOption, monacoEditorOptions.value)))
     })
+    watch(
+      () => props.monacoOptions,
+      n => {
+        if (!!n) {
+          monacoEditorOptions.value = n
+        }
+      },
+      { immediate: true, deep: true }
+    )
     watch(
       () => computedMonacoEditorOption.value,
       n => {
@@ -108,7 +132,7 @@ export default defineComponent({
     watch(
       () => props.modelValue,
       n => {
-        if (!!n) {
+        if (!!n && props.bidibind) {
           if (!!monacoEditorInstance.value) {
             monacoEditorInstance.value?.setValue(n)
           } else {
@@ -176,13 +200,46 @@ export default defineComponent({
         ])
       }
     }
+    /**
+     * 重置MonacoEditor的配置
+     * @param options 配置
+     */
+    function resetMonacoEditorOptions(options: Partial<Monaco.editor.IStandaloneEditorConstructionOptions>) {
+      monacoEditorOptions.value = mergeDeepRight(monacoEditorOptions.value, options) as Partial<
+        Monaco.editor.IStandaloneEditorConstructionOptions & { theme: 'vs-dark' | 'vs-light' }
+      >
+    }
+    /**
+     * 刷新 MonacoEditor
+     */
+    function refreshMonacoEditor() {
+      initMonacoEditor(innerValue.value)
+    }
+    /**
+     * 全屏切换
+     */
+    function fullscreenSwitch() {
+      isFullScreen.value = !isFullScreen.value
+    }
+    /**
+     * 全屏切换
+     */
+    function commit() {
+      context.emit('update:modelValue', innerValue.value)
+      context.emit('change', innerValue.value)
+    }
     return {
       context,
       MonacoEditorRef,
+      isFullScreen,
       // theme: computedMonacoEditorOption.value.theme,
       computedMonacoEditorOption,
       innerValue,
-      insertCodeString
+      insertCodeString,
+      fullscreenSwitch,
+      resetMonacoEditorOptions,
+      refreshMonacoEditor,
+      commit
     }
   }
 })

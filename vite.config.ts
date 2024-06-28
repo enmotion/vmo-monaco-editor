@@ -30,7 +30,7 @@ export default defineConfig({
     },
     sourcemap: false,
     rollupOptions: {
-      external: ['vue', 'monaco-editor', 'ramda'],
+      external: ['vue', 'monaco-editor', 'ramda', /^monaco-editor/],
       output: {
         globals: {
           vue: 'vue',
