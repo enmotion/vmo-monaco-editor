@@ -62,11 +62,20 @@ const vmoMonacoEditorInstance = ref(null as any)
           theme: 'vs-dark',
           language: 'sql'
         }"
-        :need-confirm="true"
+        :need-confirm="false"
         class="w-[800px] flex-grow"
         @update:modeValue="codeContent = $event"
         @change="codeContent = $event">
-        <vmo-monaco-ui :monaco="vmoMonacoEditorInstance"></vmo-monaco-ui>
+        <vmo-monaco-ui
+          :monaco="vmoMonacoEditorInstance"
+          :config="{
+            theme: true,
+            lineNumbers: true,
+            minimap: true,
+            fontSize: true,
+            fullScreen: true,
+            languages: ['css', 'typescript', 'sql']
+          }"></vmo-monaco-ui>
       </vmo-monaco-editor>
     </div>
   </div>

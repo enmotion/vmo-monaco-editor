@@ -205,6 +205,7 @@ export default defineComponent({
      * @param options 配置
      */
     function resetMonacoEditorOptions(options: Partial<Monaco.editor.IStandaloneEditorConstructionOptions>) {
+      console.log(options, 'resetMonacoEditorOptions')
       monacoEditorOptions.value = mergeDeepRight(monacoEditorOptions.value, options) as Partial<
         Monaco.editor.IStandaloneEditorConstructionOptions & { theme: 'vs-dark' | 'vs-light' }
       >
@@ -228,6 +229,14 @@ export default defineComponent({
       context.emit('update:modelValue', innerValue.value)
       context.emit('change', innerValue.value)
     }
+    /**
+     * 切换编辑器语言
+     * @param language
+     */
+    function changeLanguage(language: string) {
+      const model = monacoEditorInstance.value?.getModel()
+      !!model && Monaco.editor.setModelLanguage(model, language)
+    }
     return {
       context,
       MonacoEditorRef,
@@ -239,6 +248,7 @@ export default defineComponent({
       fullscreenSwitch,
       resetMonacoEditorOptions,
       refreshMonacoEditor,
+      changeLanguage,
       commit
     }
   }
