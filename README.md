@@ -1,18 +1,129 @@
 # vmo-monaco-editor
 
-This template should help get you started developing with Vue 3 and TypeScript in Vite. The template uses Vue 3 `<script setup>` SFCs, check out the [script setup docs](https://v3.vuejs.org/api/sfc-script-setup.html#sfc-script-setup) to learn more.
+`vmo-monaco-editor` 是基于 [vue3](https://vuejs.org/) 对 [monaco-editor](https://microsoft.github.io/monaco-editor/) 的再次封装；可在实际项目开发中简便的引入 `monaco-editor`
 
-## Recommended IDE Setup
+## 安装
 
-- [VS Code](https://code.visualstudio.com/) + [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar) (and disable Vetur) + [TypeScript Vue Plugin (Volar)](https://marketplace.visualstudio.com/items?itemName=Vue.vscode-typescript-vue-plugin).
+```nodejs
+npm i monaco-editor // current:0.33.0
+npm i vmo-monaco-editor --save // install vmo-monaco-editor
+```
 
-## Type Support For `.vue` Imports in TS
+## 插件环境配置
 
-TypeScript cannot handle type information for `.vue` imports by default, so we replace the `tsc` CLI with `vue-tsc` for type checking. In editors, we need [TypeScript Vue Plugin (Volar)](https://marketplace.visualstudio.com/items?itemName=Vue.vscode-typescript-vue-plugin) to make the TypeScript language service aware of `.vue` types.
+vite 配置方式
 
-If the standalone TypeScript plugin doesn't feel fast enough to you, Volar has also implemented a [Take Over Mode](https://github.com/johnsoncodehk/volar/discussions/471#discussioncomment-1361669) that is more performant. You can enable it by the following steps:
+```
+npm i vite-plugin-monaco-editor  -D // install vite-plugin-monaco-editor
+```
 
-1. Disable the built-in TypeScript Extension
-   1. Run `Extensions: Show Built-in Extensions` from VSCode's command palette
-   2. Find `TypeScript and JavaScript Language Features`, right click and select `Disable (Workspace)`
-2. Reload the VSCode window by running `Developer: Reload Window` from the command palette.
+vite.config
+
+```ts
+import { defineConfig } from 'vite' // 5.0
+import vue from '@vitejs/plugin-vue' // 3.3.4
+import monacoEditorPlugin from 'vite-plugin-monaco-editor' //1.1.0
+
+export default defineConfig({
+  ...
+  plugins: [
+    vue(),
+    // 如果 vite.config 为 ts 则可能需要使用注释，vite-plugin-monaco-editor 的模块入口与类型声明不一致 导致的问题修复
+    //@ts-ignore
+    monacoEditorPlugin.default({
+      languageWorkers: ['editorWorkerService', 'css', 'html', 'json', 'typescript'],
+      ....
+    })
+    ...
+  ],
+})
+```
+
+## 使用方式
+
+创建 componet.vue 单文件，此单例使用了 [tailwind.css](https://tailwindcss.com/)
+
+```typescript
+<script setup lang='ts'>
+  import {ref} from 'vue';
+  import { vmoMonacoEditor } from 'vmo-monaco-editor'; // 引入组件
+  import 'vmo-monaco-editor/dist/style.css';
+  const codeContent = ref('SELECT * FROM table_name');
+</script>
+
+<template>
+  <div class="flex flex-row grow-1 h-full">
+    <div class="flex-col flex flex-grow w-0 bg-white border p-[10px]">
+      <textarea v-model="codeContent" class="border h-[200px]" :rows="4" />
+    </div>
+    <vmo-monaco-editor
+      :model-value="codeContent"
+      prefix="function(name){"
+      :option-config="{
+        theme: 'vs-dark',
+        language: 'sql'
+      }"
+      class="w-[800px]"
+      @update:modeValue="codeContent = $event"
+      @change="codeContent = $event">
+    </vmo-monaco-editor>
+  </div>
+</template>
+
+```
+
+## 组件属性与事件
+
+实例属性
+
+```ts
+props:{
+  prefix: {
+    // 前置内容
+    type: String as PropType<string>,
+    default: '(()=>{})'
+  },
+  modelValue: {
+    // 代码内容
+    type: String as PropType<string>,
+    default: 'const aa:number = 12;'
+  },
+  suffix: {
+    // 后置内容
+    type: String as PropType<string>,
+    default: '};'
+  },
+  needConfirm: {
+    // 是否需要触发确认才能触发
+    type: Boolean as PropType<boolean>,
+    default: false
+  },
+  optionConfig: {
+    // monaco-editor 配置
+    type: Object as PropType<
+      Partial<Monaco.editor.IStandaloneEditorConstructionOptions & { theme: 'vs-dark' | 'vs-light' }>
+    >,
+    default: () => ({})
+  }
+}
+```
+
+实例事件
+
+```ts
+emits: ['update:modelValue', 'change', 'focuse', 'blur'],
+
+// 前提:props.needConfirm:false
+updata:modelValue:($event:string)=>any // v-model 的实现,返回当前编写的代码
+// 前提:props.needConfirm:false
+change:($event:string)=>any // 时失焦后触发代码内容提交,返回当前编写的代码，
+
+focues // 获得焦点事件
+blur // 失去焦点事件
+```
+
+实例方法
+
+```ts
+instance.insertCodeString(code:string) // 在当前光标位置插入代码 code
+```

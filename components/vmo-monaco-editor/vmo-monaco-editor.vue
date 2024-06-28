@@ -52,30 +52,74 @@ import { vmoMonacoEditorDefaultOption } from './config'
 // import { useFormItem } from 'element-plus'
 // import MonacoUiBoard from './widgets/monaco-ui-board.vue'
 // import { useGenerateUiOptions } from './use.lib/'
-import { initMonacoEnvironment } from '@lib/monaco-editor-inti'
-initMonacoEnvironment()
+
+// import { initMonacoEnvironment } from '@lib/monaco-editor-inti'
+// initMonacoEnvironment()
+Monaco.languages.registerCompletionItemProvider('sql', {
+  provideCompletionItems: function (model, position) {
+    var word = model.getWordUntilPosition(position)
+    var range = {
+      startLineNumber: position.lineNumber,
+      endLineNumber: position.lineNumber,
+      startColumn: word.startColumn,
+      endColumn: word.endColumn
+    }
+    return {
+      suggestions: [
+        {
+          label: 'SELECT',
+          kind: Monaco.languages.CompletionItemKind.Keyword,
+          insertText: 'SELECT',
+          range: range
+        },
+        {
+          label: 'FROM',
+          kind: Monaco.languages.CompletionItemKind.Keyword,
+          insertText: 'FROM',
+          range: range
+        },
+        {
+          label: 'WHERE',
+          kind: Monaco.languages.CompletionItemKind.Keyword,
+          insertText: 'WHERE',
+          range: range
+        },
+        {
+          label: 'table_name',
+          kind: Monaco.languages.CompletionItemKind.Keyword,
+          insertText: 'table_name',
+          range: range
+        }
+      ]
+    }
+  }
+})
 export default defineComponent({
   name: 'vmo-monaco-editor',
   inheritAttrs: false,
   props: {
     prefix: {
+      // 前置内容
       type: String as PropType<string>,
-      default:
-        'function(){fdsafksalkfjsadlfjsaklfasklfjasdjfkljsadfjasdlfjdsalkfjskldfjsdjfsajfasjflkasjfklsadjfklsajfklasjfklsadjfklsjfdsaklfjsadlfjlsdfjslajfklasdfjklsafjlksjal'
+      default: '(()=>{})'
     },
     modelValue: {
+      // 代码内容
       type: String as PropType<string>,
       default: 'const aa:number = 12;'
     },
     suffix: {
+      // 后置内容
       type: String as PropType<string>,
       default: '};'
     },
     needConfirm: {
+      // 是否需要触发确认才能触发
       type: Boolean as PropType<boolean>,
       default: false
     },
     optionConfig: {
+      // monaco-editor 配置
       type: Object as PropType<
         Partial<Monaco.editor.IStandaloneEditorConstructionOptions & { theme: 'vs-dark' | 'vs-light' }>
       >,
@@ -95,7 +139,8 @@ export default defineComponent({
       () => computedMonacoEditorOption.value,
       n => {
         if (n) {
-          initMonacoEditor(innerValue.value)
+          monacoEditorInstance.value?.updateOptions(computedMonacoEditorOption.value)
+          // initMonacoEditor(innerValue.value)
         }
       }
     )

@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { vmoMonacoEditor, initMonacoEnvironment } from '../index'
-initMonacoEnvironment()
-const codeContent = ref('const s =12;\nfunction aa(a:number){ return a;}')
+import { vmoMonacoEditor } from '../index'
+// initMonacoEnvironment()
+const codeContent = ref('SELECT * FROM table_name')
 </script>
 
 <template>
@@ -14,7 +14,8 @@ const codeContent = ref('const s =12;\nfunction aa(a:number){ return a;}')
       :model-value="codeContent"
       prefix="function(name){"
       :option-config="{
-        theme: 'vs-dark'
+        theme: 'vs-dark',
+        language: 'sql'
       }"
       class="w-[800px]"
       @update:modeValue="codeContent = $event"
