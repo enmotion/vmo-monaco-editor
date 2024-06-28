@@ -6,13 +6,17 @@
       computedMonacoEditorOption.theme == 'vs-dark' ? 'dark' : 'light'
     ]"
     :style="((context.attrs.style||{}) as StyleValue)">
-    <div v-if="!!prefix" :class="['prefix']">
-      <span v-html="prefix" class="extra-code"></span>
-    </div>
+    <slot v-if="!!prefix || context.slots.prefix" name="prefix" :option="computedMonacoEditorOption">
+      <div :class="['prefix']">
+        <span v-html="prefix" class="extra-code"></span>
+      </div>
+    </slot>
     <div ref="MonacoEditorRef" class="ide-container"></div>
-    <div v-if="!!suffix" :class="['suffix']">
-      <span v-html="suffix" class="extra-code"></span>
-    </div>
+    <slot v-if="!!suffix || context.slots.prefix" name="suffix" :option="computedMonacoEditorOption">
+      <div :class="['suffix']">
+        <span v-html="suffix" class="extra-code"></span>
+      </div>
+    </slot>
   </div>
 </template>
 
@@ -49,51 +53,7 @@ import type { PropType, StyleValue } from 'vue'
 import { mergeDeepRight, clone } from 'ramda'
 import * as Monaco from 'monaco-editor'
 import { vmoMonacoEditorDefaultOption } from './config'
-// import { useFormItem } from 'element-plus'
-// import MonacoUiBoard from './widgets/monaco-ui-board.vue'
-// import { useGenerateUiOptions } from './use.lib/'
 
-// import { initMonacoEnvironment } from '@lib/monaco-editor-inti'
-// initMonacoEnvironment()
-Monaco.languages.registerCompletionItemProvider('sql', {
-  provideCompletionItems: function (model, position) {
-    var word = model.getWordUntilPosition(position)
-    var range = {
-      startLineNumber: position.lineNumber,
-      endLineNumber: position.lineNumber,
-      startColumn: word.startColumn,
-      endColumn: word.endColumn
-    }
-    return {
-      suggestions: [
-        {
-          label: 'SELECT',
-          kind: Monaco.languages.CompletionItemKind.Keyword,
-          insertText: 'SELECT',
-          range: range
-        },
-        {
-          label: 'FROM',
-          kind: Monaco.languages.CompletionItemKind.Keyword,
-          insertText: 'FROM',
-          range: range
-        },
-        {
-          label: 'WHERE',
-          kind: Monaco.languages.CompletionItemKind.Keyword,
-          insertText: 'WHERE',
-          range: range
-        },
-        {
-          label: 'table_name',
-          kind: Monaco.languages.CompletionItemKind.Keyword,
-          insertText: 'table_name',
-          range: range
-        }
-      ]
-    }
-  }
-})
 export default defineComponent({
   name: 'vmo-monaco-editor',
   inheritAttrs: false,
