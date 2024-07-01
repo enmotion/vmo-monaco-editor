@@ -99,7 +99,7 @@ export default defineComponent({
   },
   emits: ['change', 'update:modelValue', 'focuse', 'blur'],
   setup(props, context) {
-    const isFullScreen = ref(true as any)
+    const isFullScreen = ref(false as any)
     const innerValue = ref('')
     const MonacoEditorRef = shallowRef(null as any)
     const monacoEditorInstance = shallowRef(null as null | Monaco.editor.IStandaloneCodeEditor)
