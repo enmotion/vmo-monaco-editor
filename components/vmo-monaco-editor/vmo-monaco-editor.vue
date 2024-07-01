@@ -132,7 +132,7 @@ export default defineComponent({
     watch(
       () => props.modelValue,
       n => {
-        if (!!n && props.bidibind) {
+        if (!!n && props.bidibind && n != innerValue.value) {
           if (!!monacoEditorInstance.value) {
             monacoEditorInstance.value?.setValue(n)
           } else {

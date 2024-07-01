@@ -1,6 +1,6 @@
 <template>
   <div :class="['vmo-monaco-ui', monaco?.computedMonacoEditorOption?.theme == 'vs-dark' ? 'dark' : 'light']">
-    <span class="title">VMO:Monaco{{ fontsize }}</span>
+    <span class="title">{{ title }}</span>
     <span class="setting">
       <span v-if="config.languages && config.languages.length > 1" class="languages">
         <select v-model="language" @change="monaco?.changeLanguage(language)">
@@ -72,7 +72,7 @@
   @apply bg-[#FFFFFF] text-gray-800;
 }
 .vmo-monaco-ui .title {
-  @apply text-xs font-bold uppercase flex-grow;
+  @apply text-xs font-bold flex-grow;
 }
 .vmo-monaco-ui .setting {
   @apply text-xs flex flex-row items-center;
@@ -114,6 +114,10 @@ export default defineComponent({
   name: 'vmo-monaco-ui',
   inheritAttrs: false,
   props: {
+    title: {
+      type: String as PropType<string>,
+      default: 'VMO:Editor'
+    },
     monaco: {
       type: Object as PropType<Record<string, any>> | null,
       default: null

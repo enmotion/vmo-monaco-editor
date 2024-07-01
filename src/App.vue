@@ -64,7 +64,7 @@ const vmoMonacoEditorInstance = ref(null as any)
         }"
         :need-confirm="false"
         class="w-[800px] flex-grow"
-        @update:modeValue="codeContent = $event"
+        @update:modelValue="codeContent = $event"
         @change="codeContent = $event">
         <vmo-monaco-ui
           :monaco="vmoMonacoEditorInstance"
