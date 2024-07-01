@@ -53,7 +53,7 @@
           })
         "></span>
       <span
-        v-if="!!monaco.needConfirm"
+        v-if="!!monaco?.needConfirm"
         :class="['iconButton runningStyle iconfont vmo-running']"
         @click="monaco?.commit()"></span>
     </span>
