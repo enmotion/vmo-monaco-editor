@@ -7,7 +7,7 @@
         computedMonacoEditorOption.theme == 'vs-dark' ? 'dark' : 'light',
         isFullScreen ? 'isFullScreen' : ''
       ]"
-      :style="((context.attrs.style||{}) as StyleValue)">
+      :style="mergeDeepRight(context.attrs?.style || {}, isFullScreen ? { zIndex: zIndex } : {})">
       <slot v-if="context.slots.default"></slot>
       <slot v-if="!!prefix || context.slots.prefix" name="prefix" :option="computedMonacoEditorOption">
         <div :class="['prefix']">
@@ -88,6 +88,10 @@ export default defineComponent({
     bidibind: {
       type: Boolean as PropType<boolean>,
       default: true
+    },
+    zIndex: {
+      type: Number as PropType<number>,
+      default: 99
     },
     monacoOptions: {
       // monaco-editor 配置
@@ -245,6 +249,7 @@ export default defineComponent({
       computedMonacoEditorOption,
       innerValue,
       monacoEditorOptions,
+      mergeDeepRight,
       insertCodeString,
       fullscreenSwitch,
       resetMonacoEditorOptions,

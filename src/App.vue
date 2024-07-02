@@ -58,6 +58,7 @@ const vmoMonacoEditorInstance = ref(null as any)
         :model-value="codeContent"
         prefix="function(name){"
         suffix="};"
+        :z-index="5000"
         :monaco-options="{
           theme: 'vs-dark',
           language: 'sql'
