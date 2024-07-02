@@ -81,15 +81,17 @@ export default defineComponent({
       default: '};'
     },
     needConfirm: {
-      // 是否需要触发确认才能触发
+      // 是否需要触发确认才能提交代码
       type: Boolean as PropType<boolean>,
       default: false
     },
     bidibind: {
+      // 是否双向绑定，当 props.modelValue 在外部发生变化时，也会同步触发代码编辑内容变化
       type: Boolean as PropType<boolean>,
       default: true
     },
     zIndex: {
+      // 全屏模式时，其z-index 的值
       type: Number as PropType<number>,
       default: 99
     },

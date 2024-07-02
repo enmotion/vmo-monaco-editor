@@ -47,7 +47,7 @@ export default defineConfig({
 <script setup lang='ts'>
   import {ref} from 'vue';
   import { vmoMonacoEditor } from 'vmo-monaco-editor'; // 引入组件
-  import 'vmo-monaco-editor/dist/style.css';
+  import 'vmo-monaco-editor/dist/style.css'; // 引入组件外观样式
   const codeContent = ref('SELECT * FROM table_name');
 </script>
 
@@ -77,7 +77,7 @@ export default defineConfig({
 实例属性
 
 ```ts
-props:{
+props: {
   prefix: {
     // 前置内容
     type: String as PropType<string>,
@@ -94,9 +94,19 @@ props:{
     default: '};'
   },
   needConfirm: {
-    // 是否需要触发确认才能触发
+    // 是否需要触发确认才能提交代码
     type: Boolean as PropType<boolean>,
     default: false
+  },
+  bidibind: {
+    // 是否双向绑定，当 props.modelValue 在外部发生变化时，也会同步触发代码编辑内容变化
+    type: Boolean as PropType<boolean>,
+    default: true
+  },
+  zIndex: {
+    // 全屏模式时，其z-index 的值
+    type: Number as PropType<number>,
+    default: 99
   },
   monacoOptions: {
     // monaco-editor 配置
@@ -105,7 +115,7 @@ props:{
     >,
     default: () => ({})
   }
-}
+},
 ```
 
 实例事件
@@ -126,4 +136,9 @@ blur // 失去焦点事件
 
 ```ts
 instance.insertCodeString(code:string) // 在当前光标位置插入代码 code
+instance.fullscreenSwitch() // 全屏模式切换
+instance.resetMonacoEditorOptions(options: Partial<Monaco.editor.IStandaloneEditorConstructionOptions>) // 将重制 MonacoEditor的配置 运行时更改
+instance.refreshMonacoEditor() // 刷新
+instance.changeLanguage(language:string) // 切换语言
+instance.commit() // 外部主动触发提交内部编写的代码
 ```
