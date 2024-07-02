@@ -53,7 +53,7 @@
 
 <script lang="ts">
 import { defineComponent, ref, shallowRef, onMounted, watch, computed, readonly, nextTick } from 'vue'
-import { mergeDeepRight } from 'ramda'
+import { mergeDeepRight, equals, clone } from 'ramda'
 import 'monaco-editor/esm/vs/basic-languages/css/css.contribution'
 import 'monaco-editor/esm/vs/basic-languages/xml/xml.contribution'
 import 'monaco-editor/esm/vs/basic-languages/javascript/javascript.contribution'
@@ -112,9 +112,9 @@ export default defineComponent({
     })
     watch(
       () => props.monacoOptions,
-      n => {
-        if (!!n) {
-          monacoEditorOptions.value = n
+      (n, o) => {
+        if (!!n && !equals(n, o)) {
+          monacoEditorOptions.value = clone(n)
         }
       },
       { immediate: true, deep: true }
@@ -244,6 +244,7 @@ export default defineComponent({
       // theme: computedMonacoEditorOption.value.theme,
       computedMonacoEditorOption,
       innerValue,
+      monacoEditorOptions,
       insertCodeString,
       fullscreenSwitch,
       resetMonacoEditorOptions,
