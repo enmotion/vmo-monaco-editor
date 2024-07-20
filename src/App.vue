@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { VmoMonacoEditor, VmoMonacoUi, useReminder } from '../index'
+import { VmoMonacoEditor, VmoMonacoUi, useReminderPlugin } from '../index'
 import * as Monaco from 'monaco-editor'
 // initMonacoEnvironment()
 const codeContent = ref('SELECT * FROM table_name')
-const sqlReminderGenerator = useReminder('sql')
-const pythonReminderGenerator = useReminder('python')
-const typescriptReminderGenerator = useReminder()
+const sqlReminderGenerator = useReminderPlugin('sql')
+const pythonReminderGenerator = useReminderPlugin('python')
+const typescriptReminderGenerator = useReminderPlugin()
 Monaco.languages.registerCompletionItemProvider(
   'sql',
   sqlReminderGenerator({

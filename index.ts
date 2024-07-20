@@ -12,8 +12,15 @@ const _providers = {
   groovy: groovyProvider,
   defaultProvider: defaultProvider
 }
-function useReminder(language?: 'sql' | 'python' | 'groovy') {
+function useReminderPlugin(language?: 'sql' | 'python' | 'groovy') {
   return language ? _providers[language] : _providers['defaultProvider']
 }
 // import { initMonacoEnvironment } from '@lib/monaco-editor-inti'
-export { VmoMonacoContext, VmoMonacoContextMethod, VmoMonacoContextObject, VmoMonacoEditor, VmoMonacoUi, useReminder }
+export {
+  VmoMonacoContext,
+  VmoMonacoContextMethod,
+  VmoMonacoContextObject,
+  VmoMonacoEditor,
+  VmoMonacoUi,
+  useReminderPlugin
+}
