@@ -1,9 +1,9 @@
 import * as Monaco from 'monaco-editor'
-import { MonacoContent, MonacoMethod } from '@type'
+import { VmoMonacoContext, VmoMonacoContextMethod } from '@type'
 export const computedCompletionItems = (
   model: Monaco.editor.ITextModel,
   position: Monaco.Position,
-  content: MonacoContent
+  content: VmoMonacoContext
 ): Monaco.languages.ProviderResult<Monaco.languages.CompletionList> => {
   const word = model.getWordUntilPosition(position)
   const range = {
@@ -38,8 +38,8 @@ export const computedCompletionItems = (
     })
   )
   content.methods.map(func => {
-    if ((func as MonacoMethod).label) {
-      const method: MonacoMethod = func as MonacoMethod
+    if ((func as VmoMonacoContextMethod).label) {
+      const method: VmoMonacoContextMethod = func as VmoMonacoContextMethod
       const params = method.parameters?.map?.(p => `${p.name}${p.type ? ':' + p.type : ''}`).join(', ')
       console.log(func, {
         value: `${method.documentation}\n\nParameters:\n

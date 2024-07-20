@@ -1,6 +1,6 @@
 import * as Monaco from 'monaco-editor'
 import { computedCompletionItems } from '@lib/monaco-editor-inti'
-import type { MonacoExtraContent, MonacoMethod, MonacoObject } from '@type'
+import type { VmoMonacoContext, VmoMonacoContextMethod, VmoMonacoContextObject } from '@type'
 const languageKeywords = [
   'SELECT',
   'INSERT',
@@ -86,7 +86,7 @@ const languageTypes = [
   'SET',
   'ARRAY'
 ]
-const languageMethods: (MonacoMethod | string)[] = [
+const languageMethods: (VmoMonacoContextMethod | string)[] = [
   'COUNT',
   'SUM',
   'AVG',
@@ -133,9 +133,9 @@ const languageOperators = [
   'OR',
   'NOT'
 ]
-const contextObjects: MonacoObject[] = []
+const contextObjects: VmoMonacoContextObject[] = []
 export default function RegisterCompletionItemProvider(
-  extra: Partial<MonacoExtraContent>
+  extra: Partial<VmoMonacoContext>
 ): Monaco.languages.CompletionItemProvider {
   const types = languageTypes.concat(extra?.types || [])
   const operators = languageOperators.concat(extra?.operators || [])

@@ -1,13 +1,13 @@
 import * as Monaco from 'monaco-editor'
-import type { MonacoExtraContent, MonacoMethod, MonacoObject } from '@type'
+import type { VmoMonacoContext, VmoMonacoContextMethod, VmoMonacoContextObject } from '@type'
 import { computedCompletionItems } from '@lib/monaco-editor-inti'
 const languageKeywords: string[] = []
-const languageMethods: (MonacoMethod | string)[] = []
+const languageMethods: (VmoMonacoContextMethod | string)[] = []
 const languageTypes: string[] = []
 const languageOperators: string[] = []
-const contextObjects: MonacoObject[] = []
+const contextObjects: VmoMonacoContextObject[] = []
 export default function RegisterCompletionItemProvider(
-  extra: Partial<MonacoExtraContent>
+  extra: Partial<VmoMonacoContext>
 ): Monaco.languages.CompletionItemProvider {
   const types = languageTypes.concat(extra?.types || [])
   const operators = languageOperators.concat(extra?.operators || [])

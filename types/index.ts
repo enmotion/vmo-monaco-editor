@@ -1,24 +1,17 @@
-export type MonacoExtraContent = {
-  propertys: string[]
-  methods: (MonacoMethod | string)[]
+export type VmoMonacoContext = {
   types: string[]
-  operators: string[]
-  objects: MonacoObject[]
-}
+  propertys: string[]
+  methods: (VmoMonacoContextMethod | string)[]
 
-export type MonacoContent = {
-  types: string[]
-  propertys: string[]
-  methods: (MonacoMethod | string)[]
   operators: string[]
-  objects: MonacoObject[]
+  objects: VmoMonacoContextObject[]
 }
-export type MonacoObject = {
+export type VmoMonacoContextObject = {
   label: string
   properties: { name: string; type: string; description: string }[]
   methods: { name: string; parameters: string; description: string }[]
 }
-export type MonacoMethod = {
+export type VmoMonacoContextMethod = {
   label: string
   documentation?: string
   parameters?: { name: string; type?: string; description?: string }[]
