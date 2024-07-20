@@ -1,24 +1,72 @@
-// //@ts-ignore
-// import EditorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker'
-// //@ts-ignore
-// import TsWorker from 'monaco-editor/esm/vs/language/typescript/ts.worker?worker'
-// //@ts-ignore
-// import JsonWorker from 'monaco-editor/esm/vs/language/json/json.worker?worker'
-// //@ts-ignore
-// import CssWorker from 'monaco-editor/esm/vs/language/css/css.worker?worker'
-// //@ts-ignore
-// import HtmlWorker from 'monaco-editor/esm/vs/language/html/html.worker?worker'
-
-// export function initMonacoEnvironment() {
-//   if (window.MonacoEnvironment == undefined) {
-//     window.MonacoEnvironment = {
-//       getWorker(_, label) {
-//         if (label === 'typescript' || label === 'javascript') return new TsWorker() //出于不明原因，vite打包会出现 过早已存在的复制问题，需要暂时注释该行代码
-//         if (label === 'json') return new JsonWorker()
-//         if (label === 'css') return new CssWorker()
-//         if (label === 'html') return new HtmlWorker()
-//         return new EditorWorker()
-//       }
-//     }
-//   }
-// }
+import * as Monaco from 'monaco-editor'
+import { MonacoContent, MonacoMethod } from '@type'
+export const computedCompletionItems = (
+  model: Monaco.editor.ITextModel,
+  position: Monaco.Position,
+  content: MonacoContent
+): Monaco.languages.ProviderResult<Monaco.languages.CompletionList> => {
+  const word = model.getWordUntilPosition(position)
+  const range = {
+    startLineNumber: position.lineNumber,
+    endLineNumber: position.lineNumber,
+    startColumn: word.startColumn,
+    endColumn: word.endColumn
+  }
+  const suggestions: Monaco.languages.CompletionItem[] = []
+  content.types.map(type => {
+    suggestions.push({
+      label: type,
+      kind: Monaco.languages.CompletionItemKind.TypeParameter,
+      insertText: type,
+      range: range
+    })
+  })
+  content.operators.map(operator =>
+    suggestions.push({
+      label: operator,
+      kind: Monaco.languages.CompletionItemKind.Operator,
+      insertText: operator,
+      range: range
+    })
+  )
+  content.propertys.map(keyword =>
+    suggestions.push({
+      label: keyword,
+      kind: Monaco.languages.CompletionItemKind.Keyword,
+      insertText: keyword,
+      range: range
+    })
+  )
+  content.methods.map(func => {
+    if ((func as MonacoMethod).label) {
+      const method: MonacoMethod = func as MonacoMethod
+      const params = method.parameters?.map?.(p => `${p.name}${p.type ? ':' + p.type : ''}`).join(', ')
+      console.log(func, {
+        value: `${method.documentation}\n\nParameters:\n
+        ${method.parameters?.map?.(p => `- ${p.name}: ${p.description}`).join('\n')}`
+      })
+      suggestions.push({
+        label: method.label,
+        kind: Monaco.languages.CompletionItemKind.Method,
+        insertText: `${method.label}()`,
+        insertTextRules: Monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+        documentation: {
+          value: `${method.documentation}\n\nParameters:\n
+          ${method.parameters?.map?.(p => `- ${p.name}: ${p.description}`).join('\n')}`
+        },
+        range: range
+      })
+    } else {
+      suggestions.push({
+        label: func,
+        kind: Monaco.languages.CompletionItemKind.Function,
+        insertText: func + '()',
+        insertTextRules: Monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+        range: range
+      })
+    }
+  })
+  return {
+    suggestions: suggestions
+  }
+}

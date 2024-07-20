@@ -132,6 +132,14 @@ focues // 获得焦点事件
 blur // 失去焦点事件
 ```
 
+实例插槽
+
+```
+<template #default></template>
+<template #prefix></template>
+<template #suffix></template>
+```
+
 实例方法
 
 ```ts

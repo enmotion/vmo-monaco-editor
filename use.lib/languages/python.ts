@@ -1,6 +1,7 @@
 import * as Monaco from 'monaco-editor'
-import type { MonacoExtraContent } from '@type'
-const pythonKeywords = [
+import type { MonacoExtraContent, MonacoMethod, MonacoObject } from '@type'
+import { computedCompletionItems } from '@lib/monaco-editor-inti'
+const languageKeywords = [
   'False',
   'None',
   'True',
@@ -35,7 +36,7 @@ const pythonKeywords = [
   'with',
   'yield'
 ]
-const pythonBuiltins = [
+const languageMethods: (MonacoMethod | string)[] = [
   'abs',
   'all',
   'any',
@@ -107,7 +108,7 @@ const pythonBuiltins = [
   'vars',
   'zip'
 ]
-const pythonDataTypes = [
+const lanugageTypes = [
   'int',
   'float',
   'complex',
@@ -122,7 +123,7 @@ const pythonDataTypes = [
   'bytearray',
   'frozenset'
 ]
-const pythonOperators = [
+const languageOperators = [
   '+',
   '-',
   '*',
@@ -152,51 +153,24 @@ const pythonOperators = [
   'or',
   'not'
 ]
-export function pythonReminderRegisterCompletionItemProvider(
+const contextObjects: MonacoObject[] = []
+export default function RegisterCompletionItemProvider(
   extra: Partial<MonacoExtraContent>
 ): Monaco.languages.CompletionItemProvider {
+  const types = lanugageTypes.concat(extra?.types || [])
+  const operators = languageOperators.concat(extra?.operators || [])
+  const propertys = languageKeywords.concat(extra?.propertys || [])
+  const methods = languageMethods.concat(extra?.methods || [])
+  const objects = contextObjects.concat(extra?.objects || [])
   return {
     provideCompletionItems: function (model, position) {
-      const word = model.getWordUntilPosition(position)
-      const types = pythonDataTypes.concat(extra?.dateTypes || [])
-      const operators = pythonBuiltins.concat(extra?.operators || [])
-      const keywords = pythonKeywords.concat(extra?.propertys || [])
-      const methods = pythonBuiltins.concat(extra?.methods || [])
-      const range = {
-        startLineNumber: position.lineNumber,
-        endLineNumber: position.lineNumber,
-        startColumn: word.startColumn,
-        endColumn: word.endColumn
-      }
-      return {
-        suggestions: [
-          ...types.map(type => ({
-            label: type,
-            kind: Monaco.languages.CompletionItemKind.TypeParameter,
-            insertText: type,
-            range: range
-          })),
-          ...operators.map(operator => ({
-            label: operator,
-            kind: Monaco.languages.CompletionItemKind.Operator,
-            insertText: operator,
-            range: range
-          })),
-          ...keywords.map(keyword => ({
-            label: keyword,
-            kind: Monaco.languages.CompletionItemKind.Keyword,
-            insertText: keyword,
-            range: range
-          })),
-          ...methods.map(func => ({
-            label: func,
-            kind: Monaco.languages.CompletionItemKind.Function,
-            insertText: func + '()',
-            insertTextRules: Monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-            range: range
-          }))
-        ]
-      }
+      return computedCompletionItems(model, position, {
+        types,
+        operators,
+        propertys,
+        methods,
+        objects
+      })
     }
   }
 }

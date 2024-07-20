@@ -1,6 +1,7 @@
 import * as Monaco from 'monaco-editor'
-import type { MonacoExtraContent } from '@type'
-const sqlKeywords = [
+import { computedCompletionItems } from '@lib/monaco-editor-inti'
+import type { MonacoExtraContent, MonacoMethod, MonacoObject } from '@type'
+const languageKeywords = [
   'SELECT',
   'INSERT',
   'UPDATE',
@@ -59,7 +60,7 @@ const sqlKeywords = [
   'IFNULL',
   'IF'
 ]
-const sqlDataTypes = [
+const languageTypes = [
   'INT',
   'INTEGER',
   'SMALLINT',
@@ -85,7 +86,7 @@ const sqlDataTypes = [
   'SET',
   'ARRAY'
 ]
-const sqlFunctions = [
+const languageMethods: (MonacoMethod | string)[] = [
   'COUNT',
   'SUM',
   'AVG',
@@ -111,7 +112,7 @@ const sqlFunctions = [
   'CURRENT_TIME',
   'CURRENT_TIMESTAMP'
 ]
-const sqlOperators = [
+const languageOperators = [
   '+',
   '-',
   '*',
@@ -132,51 +133,63 @@ const sqlOperators = [
   'OR',
   'NOT'
 ]
-export function sqlReminderRegisterCompletionItemProvider(
+const contextObjects: MonacoObject[] = []
+export default function RegisterCompletionItemProvider(
   extra: Partial<MonacoExtraContent>
 ): Monaco.languages.CompletionItemProvider {
+  const types = languageTypes.concat(extra?.types || [])
+  const operators = languageOperators.concat(extra?.operators || [])
+  const propertys = languageKeywords.concat(extra?.propertys || [])
+  const methods = languageMethods.concat(extra?.methods || [])
+  const objects = contextObjects.concat(extra?.objects || [])
   return {
-    provideCompletionItems: function (model, position) {
-      const word = model.getWordUntilPosition(position)
-      const types = sqlDataTypes.concat(extra?.dateTypes || [])
-      const operators = sqlOperators.concat(extra?.operators || [])
-      const keywords = sqlKeywords.concat(extra?.propertys || [])
-      const methods = sqlFunctions.concat(extra?.methods || [])
-      const range = {
-        startLineNumber: position.lineNumber,
-        endLineNumber: position.lineNumber,
-        startColumn: word.startColumn,
-        endColumn: word.endColumn
-      }
-      return {
-        suggestions: [
-          ...types.map(type => ({
-            label: type,
-            kind: Monaco.languages.CompletionItemKind.TypeParameter,
-            insertText: type,
-            range: range
-          })),
-          ...operators.map(operator => ({
-            label: operator,
-            kind: Monaco.languages.CompletionItemKind.Operator,
-            insertText: operator,
-            range: range
-          })),
-          ...keywords.map(keyword => ({
-            label: keyword,
-            kind: Monaco.languages.CompletionItemKind.Keyword,
-            insertText: keyword,
-            range: range
-          })),
-          ...methods.map(func => ({
-            label: func,
-            kind: Monaco.languages.CompletionItemKind.Function,
-            insertText: func + '()',
-            insertTextRules: Monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-            range: range
-          }))
-        ]
-      }
+    provideCompletionItems: function (
+      model,
+      position
+    ): Monaco.languages.ProviderResult<Monaco.languages.CompletionList> {
+      return computedCompletionItems(model, position, {
+        types,
+        operators,
+        propertys,
+        methods,
+        objects
+      })
+      // const word = model.getWordUntilPosition(position)
+      // const range = {
+      //   startLineNumber: position.lineNumber,
+      //   endLineNumber: position.lineNumber,
+      //   startColumn: word.startColumn,
+      //   endColumn: word.endColumn
+      // }
+      // return {
+      //   suggestions: [
+      //     ...types.map(type => ({
+      //       label: type,
+      //       kind: Monaco.languages.CompletionItemKind.TypeParameter,
+      //       insertText: type,
+      //       range: range
+      //     })),
+      //     ...operators.map(operator => ({
+      //       label: operator,
+      //       kind: Monaco.languages.CompletionItemKind.Operator,
+      //       insertText: operator,
+      //       range: range
+      //     })),
+      //     ...keywords.map(keyword => ({
+      //       label: keyword,
+      //       kind: Monaco.languages.CompletionItemKind.Keyword,
+      //       insertText: keyword,
+      //       range: range
+      //     })),
+      //     ...methods.map(func => ({
+      //       label: func,
+      //       kind: Monaco.languages.CompletionItemKind.Function,
+      //       insertText: func + '()',
+      //       insertTextRules: Monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+      //       range: range
+      //     }))
+      //   ]
+      // }
     }
   }
 }

@@ -15,7 +15,7 @@
         </div>
       </slot>
       <div ref="MonacoEditorRef" class="ide-container"></div>
-      <slot v-if="!!suffix || context.slots.prefix" name="suffix" :option="computedMonacoEditorOption">
+      <slot v-if="!!suffix || context.slots.suffix" name="suffix" :option="computedMonacoEditorOption">
         <div :class="['suffix']">
           <span v-html="suffix" class="extra-code"></span>
         </div>

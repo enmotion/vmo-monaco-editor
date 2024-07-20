@@ -1,23 +1,55 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import {
-  VmoMonacoEditor,
-  VmoMonacoUi,
-  sqlReminderRegisterCompletionItemProvider,
-  pythonReminderRegisterCompletionItemProvider
-} from '../index'
+import { VmoMonacoEditor, VmoMonacoUi, useReminder } from '../index'
 import * as Monaco from 'monaco-editor'
 // initMonacoEnvironment()
 const codeContent = ref('SELECT * FROM table_name')
-
+const sqlReminderGenerator = useReminder('sql')
+const pythonReminderGenerator = useReminder('python')
+const typescriptReminderGenerator = useReminder()
 Monaco.languages.registerCompletionItemProvider(
   'sql',
-  sqlReminderRegisterCompletionItemProvider({
+  sqlReminderGenerator({
     propertys: ['table_a', 'table_c', '_table_a_username', '_table_a_age'],
-    methods: ['CUSTOME_SUM', 'MIXER', 'ROLLBACK', 'FLIP']
+    methods: [
+      'CUSTOME_SUM',
+      'MIXER',
+      {
+        label: 'enmotion',
+        documentation: 'sss',
+        parameters: [{ name: 'sss', description: 'you need it' }]
+      },
+      'FLIP'
+    ]
   })
 )
-// Monaco.languages.registerCompletionItemProvider('python', pythonReminderRegisterCompletionItemProvider(['user']))
+Monaco.languages.registerCompletionItemProvider(
+  'python',
+  pythonReminderGenerator({
+    propertys: ['user', 'school'],
+    methods: [
+      'fun1',
+      {
+        label: 'fund2',
+        parameters: [{ name: 'aaa', type: 'int', description: 'akdfkadf' }]
+      }
+    ]
+  })
+)
+Monaco.languages.registerCompletionItemProvider(
+  'typescript',
+  typescriptReminderGenerator({
+    propertys: ['user', 'school'],
+    methods: [
+      'fun1',
+      {
+        label: 'fund2',
+        documentation: 'need say something',
+        parameters: [{ name: 'names', description: 'this is username params ' }]
+      }
+    ]
+  })
+)
 const vmoMonacoEditorInstance = ref(null as any)
 </script>
 
@@ -30,8 +62,8 @@ const vmoMonacoEditorInstance = ref(null as any)
       <vmo-monaco-editor
         ref="vmoMonacoEditorInstance"
         :model-value="codeContent"
-        prefix="function(name){"
-        suffix="};"
+        prefix=""
+        suffix=""
         :z-index="5000"
         :monaco-options="{
           theme: 'vs-light',
@@ -42,14 +74,15 @@ const vmoMonacoEditorInstance = ref(null as any)
         @update:modelValue="codeContent = $event"
         @change="codeContent = $event">
         <vmo-monaco-ui
+          title="Coding-Sql"
           :monaco="vmoMonacoEditorInstance"
           :config="{
             theme: true,
             lineNumbers: true,
             minimap: true,
             fontSize: true,
-            fullScreen: true,
-            languages: ['css', 'typescript', 'sql']
+            fullScreen: true
+            // languages: ['css', 'typescript', 'sql']
           }"></vmo-monaco-ui>
       </vmo-monaco-editor>
     </div>
