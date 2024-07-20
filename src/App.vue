@@ -1,49 +1,23 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { VmoMonacoEditor, VmoMonacoUi } from '../index'
+import {
+  VmoMonacoEditor,
+  VmoMonacoUi,
+  sqlReminderRegisterCompletionItemProvider,
+  pythonReminderRegisterCompletionItemProvider
+} from '../index'
 import * as Monaco from 'monaco-editor'
 // initMonacoEnvironment()
 const codeContent = ref('SELECT * FROM table_name')
 
-Monaco.languages.registerCompletionItemProvider('sql', {
-  provideCompletionItems: function (model, position) {
-    var word = model.getWordUntilPosition(position)
-    var range = {
-      startLineNumber: position.lineNumber,
-      endLineNumber: position.lineNumber,
-      startColumn: word.startColumn,
-      endColumn: word.endColumn
-    }
-    return {
-      suggestions: [
-        {
-          label: 'SELECT',
-          kind: Monaco.languages.CompletionItemKind.Keyword,
-          insertText: 'SELECT',
-          range: range
-        },
-        {
-          label: 'FROM',
-          kind: Monaco.languages.CompletionItemKind.Keyword,
-          insertText: 'FROM',
-          range: range
-        },
-        {
-          label: 'WHERE',
-          kind: Monaco.languages.CompletionItemKind.Keyword,
-          insertText: 'WHERE',
-          range: range
-        },
-        {
-          label: 'table_name',
-          kind: Monaco.languages.CompletionItemKind.Keyword,
-          insertText: 'table_name',
-          range: range
-        }
-      ]
-    }
-  }
-})
+Monaco.languages.registerCompletionItemProvider(
+  'sql',
+  sqlReminderRegisterCompletionItemProvider({
+    propertys: ['table_a', 'table_c', '_table_a_username', '_table_a_age'],
+    methods: ['CUSTOME_SUM', 'MIXER', 'ROLLBACK', 'FLIP']
+  })
+)
+// Monaco.languages.registerCompletionItemProvider('python', pythonReminderRegisterCompletionItemProvider(['user']))
 const vmoMonacoEditorInstance = ref(null as any)
 </script>
 
@@ -60,7 +34,7 @@ const vmoMonacoEditorInstance = ref(null as any)
         suffix="};"
         :z-index="5000"
         :monaco-options="{
-          theme: 'vs-dark',
+          theme: 'vs-light',
           language: 'sql'
         }"
         :need-confirm="false"
