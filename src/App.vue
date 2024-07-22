@@ -74,6 +74,7 @@ const vmoMonacoEditorInstance2 = ref(null as any)
         :z-index="5000"
         :monaco-options="{
           theme: 'vs-light',
+          fontSize: 14,
           language: 'sql'
         }"
         :need-confirm="false"
@@ -83,11 +84,10 @@ const vmoMonacoEditorInstance2 = ref(null as any)
             extra: {}
           }
         ]"
-        class="w-[800px] flex-grow"
+        class="w-[800px] flex-grow border-t"
         @update:modelValue="codeContent2 = $event"
         @change="codeContent2 = $event">
         <vmo-monaco-ui
-          title="Coding-Sql"
           :monaco="vmoMonacoEditorInstance2"
           :config="{
             theme: true,

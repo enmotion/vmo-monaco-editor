@@ -13,6 +13,8 @@
           v-model="fontsize"
           class="number"
           type="number"
+          min="6"
+          max="100"
           @input="
             monaco?.resetMonacoEditorOptions({
               fontSize: fontsize
