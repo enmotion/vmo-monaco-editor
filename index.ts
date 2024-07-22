@@ -5,6 +5,7 @@ import pythonProvider from '@lib/languages/python'
 import groovyProvider from '@lib/languages/groovy'
 import defaultProvider from '@lib/languages/default'
 import type { VmoMonacoContext, VmoMonacoContextMethod, VmoMonacoContextObject } from '@type'
+// import './assets/iconfont/iconfont.css'
 
 const _providers = {
   sql: sqlProvider,

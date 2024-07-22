@@ -48,7 +48,7 @@ export const computedCompletionItems = (
       suggestions.push({
         label: method.label,
         kind: Monaco.languages.CompletionItemKind.Method,
-        insertText: `${method.label}()`,
+        insertText: `${method.label}(${params})`,
         insertTextRules: Monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
         documentation: {
           value: `${method.documentation}\n\nParameters:\n

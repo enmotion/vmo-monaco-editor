@@ -61,7 +61,7 @@
 </template>
 
 <style lang="css">
-@import url('//at.alicdn.com/t/c/font_4602780_5emdv444d9r.css');
+/* @import url('./assets/iconfont/iconfont.css'); */
 .vmo-monaco-ui {
   @apply h-[40px] flex flex-row items-center px-[15px] border-b border-[#88888830];
 }

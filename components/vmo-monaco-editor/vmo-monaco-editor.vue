@@ -58,6 +58,8 @@ import 'monaco-editor/esm/vs/basic-languages/css/css.contribution'
 import 'monaco-editor/esm/vs/basic-languages/xml/xml.contribution'
 import 'monaco-editor/esm/vs/basic-languages/javascript/javascript.contribution'
 import type { PropType, StyleValue } from 'vue'
+import { useReminderPlugin } from '../../index'
+import type { VmoMonacoContext } from '@type'
 import * as Monaco from 'monaco-editor'
 import { vmoMonacoEditorDefaultOption } from './config'
 
@@ -94,6 +96,10 @@ export default defineComponent({
       // 全屏模式时，其z-index 的值
       type: Number as PropType<number>,
       default: 99
+    },
+    remindConfig: {
+      type: Array as PropType<{ lanugage?: 'sql' | 'python' | 'groovy'; extra: Partial<VmoMonacoContext> }[]>,
+      default: () => []
     },
     monacoOptions: {
       // monaco-editor 配置
@@ -190,6 +196,12 @@ export default defineComponent({
         context.emit('blur') // 直接触发失焦事件
         !props.needConfirm && context.emit('change', innerValue.value)
       })
+      props.remindConfig.map(item => {
+        const reminder = useReminderPlugin(item.lanugage)
+        const targetModel = monacoEditorInstance.value?.getModel() as Monaco.editor.ITextModel
+        Monaco.languages.registerCompletionItemProvider(item.lanugage as string, reminder(item.extra, targetModel))
+      })
+      // Monaco.languages.registerCompletionItemProvider()
     }
     /**
      * 插入代码片段

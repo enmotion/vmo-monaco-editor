@@ -4,53 +4,13 @@ import { VmoMonacoEditor, VmoMonacoUi, useReminderPlugin } from '../index'
 import * as Monaco from 'monaco-editor'
 // initMonacoEnvironment()
 const codeContent = ref('SELECT * FROM table_name')
+const codeContent2 = ref('SELECT * FROM table_name')
 const sqlReminderGenerator = useReminderPlugin('sql')
 const pythonReminderGenerator = useReminderPlugin('python')
 const typescriptReminderGenerator = useReminderPlugin()
-Monaco.languages.registerCompletionItemProvider(
-  'sql',
-  sqlReminderGenerator({
-    propertys: ['table_a', 'table_c', '_table_a_username', '_table_a_age'],
-    methods: [
-      'CUSTOME_SUM',
-      'MIXER',
-      {
-        label: 'enmotion',
-        documentation: 'sss',
-        parameters: [{ name: 'sss', description: 'you need it' }]
-      },
-      'FLIP'
-    ]
-  })
-)
-Monaco.languages.registerCompletionItemProvider(
-  'python',
-  pythonReminderGenerator({
-    propertys: ['user', 'school'],
-    methods: [
-      'fun1',
-      {
-        label: 'fund2',
-        parameters: [{ name: 'aaa', type: 'int', description: 'akdfkadf' }]
-      }
-    ]
-  })
-)
-Monaco.languages.registerCompletionItemProvider(
-  'typescript',
-  typescriptReminderGenerator({
-    propertys: ['user', 'school'],
-    methods: [
-      'fun1',
-      {
-        label: 'fund2',
-        documentation: 'need say something',
-        parameters: [{ name: 'names', description: 'this is username params ' }]
-      }
-    ]
-  })
-)
+
 const vmoMonacoEditorInstance = ref(null as any)
+const vmoMonacoEditorInstance2 = ref(null as any)
 </script>
 
 <template>
@@ -70,6 +30,27 @@ const vmoMonacoEditorInstance = ref(null as any)
           language: 'sql'
         }"
         :need-confirm="false"
+        :remind-config="[
+          {
+            lanugage: 'sql',
+            extra: {
+              propertys: ['table_a', 'table_c', '_table_a_username', '_table_a_age'],
+              methods: [
+                'CUSTOME_SUM',
+                'MIXER',
+                {
+                  label: 'enmotion',
+                  documentation: 'sss',
+                  parameters: [
+                    { name: 'sss', description: 'you need it' },
+                    { name: 'd', description: 'you need it' }
+                  ]
+                },
+                'FLIP'
+              ]
+            }
+          }
+        ]"
         class="w-[800px] flex-grow"
         @update:modelValue="codeContent = $event"
         @change="codeContent = $event">
@@ -85,11 +66,44 @@ const vmoMonacoEditorInstance = ref(null as any)
             // languages: ['css', 'typescript', 'sql']
           }"></vmo-monaco-ui>
       </vmo-monaco-editor>
+      <vmo-monaco-editor
+        ref="vmoMonacoEditorInstance2"
+        :model-value="codeContent2"
+        prefix=""
+        suffix=""
+        :z-index="5000"
+        :monaco-options="{
+          theme: 'vs-light',
+          language: 'sql'
+        }"
+        :need-confirm="false"
+        :remind-config="[
+          {
+            lanugage: 'sql',
+            extra: {}
+          }
+        ]"
+        class="w-[800px] flex-grow"
+        @update:modelValue="codeContent2 = $event"
+        @change="codeContent2 = $event">
+        <vmo-monaco-ui
+          title="Coding-Sql"
+          :monaco="vmoMonacoEditorInstance2"
+          :config="{
+            theme: true,
+            lineNumbers: true,
+            minimap: true,
+            fontSize: true,
+            fullScreen: true
+            // languages: ['css', 'typescript', 'sql']
+          }"></vmo-monaco-ui>
+      </vmo-monaco-editor>
     </div>
   </div>
 </template>
 
 <style>
+@import url('../assets//iconfont/iconfont.css');
 html,
 body {
   height: 100%;

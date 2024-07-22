@@ -3,6 +3,7 @@ import { resolve } from 'node:path'
 import vue from '@vitejs/plugin-vue'
 import dts from 'vite-plugin-dts'
 import monacoEditorPlugin from 'vite-plugin-monaco-editor'
+import { viteStaticCopy } from 'vite-plugin-static-copy'
 // const prefix = `monaco-editor/esm/vs` // 声明 MonacoEditor 静态文件打包前缀地址
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -11,6 +12,14 @@ export default defineConfig({
   },
   plugins: [
     vue(),
+    viteStaticCopy({
+      targets: [
+        {
+          src: 'assets/iconfont/*',
+          dest: 'assets/iconfont'
+        }
+      ]
+    }),
     //@ts-ignore
     monacoEditorPlugin.default({
       languageWorkers: ['editorWorkerService', 'css', 'html', 'json', 'typescript']
