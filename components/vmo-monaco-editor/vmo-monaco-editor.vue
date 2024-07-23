@@ -53,7 +53,7 @@
 
 <script lang="ts">
 import { defineComponent, ref, shallowRef, onMounted, watch, computed, readonly, nextTick } from 'vue'
-import { mergeDeepRight, equals, clone } from 'ramda'
+import { mergeDeepRight, equals, clone, isNil } from 'ramda'
 import 'monaco-editor/esm/vs/basic-languages/css/css.contribution'
 import 'monaco-editor/esm/vs/basic-languages/xml/xml.contribution'
 import 'monaco-editor/esm/vs/basic-languages/javascript/javascript.contribution'
@@ -115,6 +115,7 @@ export default defineComponent({
     const innerValue = ref('')
     const MonacoEditorRef = shallowRef(null as any)
     const monacoEditorInstance = shallowRef(null as null | Monaco.editor.IStandaloneCodeEditor)
+    const completionProvider = ref([] as Monaco.IDisposable[])
     const monacoEditorOptions = ref(
       {} as Partial<Monaco.editor.IStandaloneEditorConstructionOptions & { theme: 'vs-dark' | 'vs-light' }>
     )
@@ -122,6 +123,31 @@ export default defineComponent({
       monacoEditorOptions.value
       return JSON.parse(JSON.stringify(mergeDeepRight(vmoMonacoEditorDefaultOption, monacoEditorOptions.value)))
     })
+    watch(
+      () => props.remindConfig,
+      (n, o) => {
+        if (!!n) {
+          completionProvider.value = completionProvider.value
+            .map(item => {
+              return item.dispose()
+            })
+            .filter(item => item != undefined)
+          nextTick(() => {
+            props.remindConfig.map((item, index) => {
+              const reminder = useReminderPlugin(item.lanugage)
+              const targetModel = monacoEditorInstance.value?.getModel() as Monaco.editor.ITextModel
+              if (targetModel) {
+                completionProvider.value[index] = Monaco.languages.registerCompletionItemProvider(
+                  item.lanugage as string,
+                  reminder(item.extra, targetModel)
+                )
+              }
+            })
+          })
+        }
+      },
+      { immediate: true, deep: true }
+    )
     watch(
       () => props.monacoOptions,
       (n, o) => {
@@ -144,7 +170,7 @@ export default defineComponent({
     watch(
       () => props.modelValue,
       n => {
-        if (!!n && props.bidibind && n != innerValue.value) {
+        if (!isNil(n) && props.bidibind && n != innerValue.value) {
           if (!!monacoEditorInstance.value) {
             monacoEditorInstance.value?.setValue(n)
           } else {
@@ -196,12 +222,6 @@ export default defineComponent({
         context.emit('blur') // 直接触发失焦事件
         !props.needConfirm && context.emit('change', innerValue.value)
       })
-      props.remindConfig.map(item => {
-        const reminder = useReminderPlugin(item.lanugage)
-        const targetModel = monacoEditorInstance.value?.getModel() as Monaco.editor.ITextModel
-        Monaco.languages.registerCompletionItemProvider(item.lanugage as string, reminder(item.extra, targetModel))
-      })
-      // Monaco.languages.registerCompletionItemProvider()
     }
     /**
      * 插入代码片段

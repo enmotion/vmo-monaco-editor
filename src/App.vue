@@ -11,46 +11,78 @@ const typescriptReminderGenerator = useReminderPlugin()
 
 const vmoMonacoEditorInstance = ref(null as any)
 const vmoMonacoEditorInstance2 = ref(null as any)
+
+const remindConfig = ref([
+  {
+    lanugage: 'sql',
+    extra: {
+      propertys: ['table_a', 'table_c', '_table_a_username', '_table_a_age'],
+      methods: [
+        'CUSTOME_SUM',
+        'MIXER',
+        {
+          label: 'enmotion',
+          documentation: 'sss',
+          parameters: [
+            { name: 'sss', description: 'you need it' },
+            { name: 'd', description: 'you need it' }
+          ]
+        },
+        'FLIP'
+      ]
+    }
+  }
+] as any)
 </script>
 
 <template>
   <div class="flex flex-row grow-1 h-full">
     <div class="flex-col flex flex-grow w-0 bg-white border p-[10px]">
       <textarea v-model="codeContent" class="border h-[200px]" :rows="4" />
+      <div
+        @click="
+          () => {
+            codeContent = ''
+            remindConfig = [
+              {
+                lanugage: 'sql',
+                extra: {
+                  propertys: ['dkkdd', 'table_c', '_table_a_username', '_table_a_age'],
+                  methods: [
+                    'CUSTOME_SUM',
+                    'MIXER',
+                    {
+                      label: 'volcano',
+                      documentation: 'sss',
+                      parameters: [
+                        { name: 'sss', description: 'you need it' },
+                        { name: 'd', description: 'you need it' }
+                      ]
+                    },
+                    'FLIP'
+                  ]
+                }
+              }
+            ]
+          }
+        ">
+        aaaa
+      </div>
     </div>
     <div class="flex-col flex bg-red-100">
       <vmo-monaco-editor
         ref="vmoMonacoEditorInstance"
         :model-value="codeContent"
-        prefix=""
+        prefix="aaa"
         suffix=""
         :z-index="5000"
         :monaco-options="{
           theme: 'vs-light',
           language: 'sql'
         }"
+        :bidibind="true"
         :need-confirm="false"
-        :remind-config="[
-          {
-            lanugage: 'sql',
-            extra: {
-              propertys: ['table_a', 'table_c', '_table_a_username', '_table_a_age'],
-              methods: [
-                'CUSTOME_SUM',
-                'MIXER',
-                {
-                  label: 'enmotion',
-                  documentation: 'sss',
-                  parameters: [
-                    { name: 'sss', description: 'you need it' },
-                    { name: 'd', description: 'you need it' }
-                  ]
-                },
-                'FLIP'
-              ]
-            }
-          }
-        ]"
+        :remind-config="remindConfig"
         class="w-[800px] flex-grow"
         @update:modelValue="codeContent = $event"
         @change="codeContent = $event">
