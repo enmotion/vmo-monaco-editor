@@ -127,11 +127,12 @@ export default defineComponent({
       () => props.remindConfig,
       (n, o) => {
         if (!!n) {
-          completionProvider.value = completionProvider.value
+          completionProvider.value
             .map(item => {
               return item.dispose()
             })
             .filter(item => item != undefined)
+          completionProvider.value = []
           nextTick(() => {
             props.remindConfig.map((item, index) => {
               const reminder = useReminderPlugin(item.lanugage)
