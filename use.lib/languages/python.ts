@@ -108,7 +108,7 @@ const languageMethods: (VmoMonacoContextMethod | string)[] = [
   'vars',
   'zip'
 ]
-const lanugageTypes = [
+const languageTypes = [
   'int',
   'float',
   'complex',
@@ -157,7 +157,7 @@ const contextObjects: VmoMonacoContextObject[] = []
 export default function RegisterCompletionItemProvider(
   extra: Partial<VmoMonacoContext>
 ): Monaco.languages.CompletionItemProvider {
-  const types = lanugageTypes.concat(extra?.types || [])
+  const types = languageTypes.concat(extra?.types || [])
   const operators = languageOperators.concat(extra?.operators || [])
   const properties = languageKeywords.concat(extra?.properties || [])
   const methods = languageMethods.concat(extra?.methods || [])
