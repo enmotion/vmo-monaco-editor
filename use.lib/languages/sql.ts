@@ -140,7 +140,7 @@ export default function RegisterCompletionItemProvider(
 ): Monaco.languages.CompletionItemProvider {
   const types = languageTypes.concat(extra?.types || [])
   const operators = languageOperators.concat(extra?.operators || [])
-  const propertys = languageKeywords.concat(extra?.propertys || [])
+  const properties = languageKeywords.concat(extra?.properties || [])
   const methods = languageMethods.concat(extra?.methods || [])
   const objects = contextObjects.concat(extra?.objects || [])
   return {
@@ -152,7 +152,7 @@ export default function RegisterCompletionItemProvider(
         ? computedCompletionItems(model, position, {
             types,
             operators,
-            propertys,
+            properties,
             methods,
             objects
           })

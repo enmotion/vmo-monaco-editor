@@ -14,9 +14,9 @@ const vmoMonacoEditorInstance2 = ref(null as any)
 
 const remindConfig = ref([
   {
-    lanugage: 'sql',
+    language: 'sql',
     extra: {
-      propertys: ['table_a', 'table_c', '_table_a_username', '_table_a_age'],
+      properties: ['table_a', 'table_c', '_table_a_username', '_table_a_age'],
       methods: [
         'CUSTOME_SUM',
         'MIXER',
@@ -45,9 +45,9 @@ const remindConfig = ref([
             codeContent = ''
             remindConfig = [
               {
-                lanugage: 'sql',
+                language: 'sql',
                 extra: {
-                  propertys: ['mod', 'table_c', '_table_a_username', '_table_a_age'],
+                  properties: ['mod', 'table_c', '_table_a_username', '_table_a_age'],
                   methods: [
                     'MOD_SUM',
                     'MOD_MiXER',
@@ -112,7 +112,7 @@ const remindConfig = ref([
         :need-confirm="false"
         :remind-config="[
           {
-            lanugage: 'sql',
+            language: 'sql',
             extra: {}
           }
         ]"

@@ -98,7 +98,7 @@ export default defineComponent({
       default: 99
     },
     remindConfig: {
-      type: Array as PropType<{ lanugage?: 'sql' | 'python' | 'groovy'; extra: Partial<VmoMonacoContext> }[]>,
+      type: Array as PropType<{ language?: 'sql' | 'python' | 'groovy'; extra: Partial<VmoMonacoContext> }[]>,
       default: () => []
     },
     monacoOptions: {
@@ -135,11 +135,11 @@ export default defineComponent({
           completionProvider.value = []
           nextTick(() => {
             props.remindConfig.map((item, index) => {
-              const reminder = useReminderPlugin(item.lanugage)
+              const reminder = useReminderPlugin(item.language)
               const targetModel = monacoEditorInstance.value?.getModel() as Monaco.editor.ITextModel
               if (targetModel) {
                 completionProvider.value[index] = Monaco.languages.registerCompletionItemProvider(
-                  item.lanugage as string,
+                  item.language as string,
                   reminder(item.extra, targetModel)
                 )
               }

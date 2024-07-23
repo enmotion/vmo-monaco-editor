@@ -1,6 +1,6 @@
 export type VmoMonacoContext = {
   types: string[]
-  propertys: string[]
+  properties: string[]
   methods: (VmoMonacoContextMethod | string)[]
 
   operators: string[]

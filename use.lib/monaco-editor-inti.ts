@@ -29,7 +29,7 @@ export const computedCompletionItems = (
       range: range
     })
   )
-  content.propertys.map(keyword =>
+  content.properties.map(keyword =>
     suggestions.push({
       label: keyword,
       kind: Monaco.languages.CompletionItemKind.Keyword,
