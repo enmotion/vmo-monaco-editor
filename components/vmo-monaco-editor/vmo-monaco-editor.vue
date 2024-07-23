@@ -75,7 +75,7 @@ export default defineComponent({
     modelValue: {
       // 代码内容
       type: String as PropType<string>,
-      default: 'const aa:number = 12;'
+      default: '//code content gose here...'
     },
     suffix: {
       // 后置内容

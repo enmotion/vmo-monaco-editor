@@ -47,19 +47,19 @@ const remindConfig = ref([
               {
                 lanugage: 'sql',
                 extra: {
-                  propertys: ['dkkdd', 'table_c', '_table_a_username', '_table_a_age'],
+                  propertys: ['mod', 'table_c', '_table_a_username', '_table_a_age'],
                   methods: [
-                    'CUSTOME_SUM',
-                    'MIXER',
+                    'MOD_SUM',
+                    'MOD_MiXER',
                     {
-                      label: 'volcano',
+                      label: 'MOD_VOLCANO',
                       documentation: 'sss',
                       parameters: [
                         { name: 'sss', description: 'you need it' },
                         { name: 'd', description: 'you need it' }
                       ]
                     },
-                    'FLIP'
+                    'MOD_FLIP'
                   ]
                 }
               }
