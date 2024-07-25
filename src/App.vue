@@ -11,7 +11,7 @@ const typescriptReminderGenerator = useReminderPlugin()
 
 const vmoMonacoEditorInstance = ref(null as any)
 const vmoMonacoEditorInstance2 = ref(null as any)
-const disabled = ref(false)
+const disabled = ref(true)
 
 const remindConfig = ref([
   {

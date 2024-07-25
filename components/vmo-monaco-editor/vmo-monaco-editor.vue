@@ -200,7 +200,8 @@ export default defineComponent({
       monacoEditorInstance.value = Monaco.editor.create(
         MonacoEditorRef.value,
         mergeDeepRight(computedMonacoEditorOption.value as Monaco.editor.IStandaloneEditorConstructionOptions, {
-          value: codeValue
+          value: codeValue,
+          readOnly: props.disabled
         })
       )
       /**
