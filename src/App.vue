@@ -11,6 +11,7 @@ const typescriptReminderGenerator = useReminderPlugin()
 
 const vmoMonacoEditorInstance = ref(null as any)
 const vmoMonacoEditorInstance2 = ref(null as any)
+const disabled = ref(false)
 
 const remindConfig = ref([
   {
@@ -68,6 +69,11 @@ const remindConfig = ref([
         ">
         aaaa
       </div>
+      <div
+        class="bg-blue-600 p-[10px] text-white rounded cursor-pointer hover:bg-blue-500"
+        @click="disabled = !disabled">
+        disabled :{{ disabled }}
+      </div>
     </div>
     <div class="flex-col flex bg-red-100">
       <vmo-monaco-editor
@@ -80,6 +86,7 @@ const remindConfig = ref([
           theme: 'vs-light',
           language: 'sql'
         }"
+        :disabled="disabled"
         :bidibind="true"
         :need-confirm="false"
         :remind-config="remindConfig"

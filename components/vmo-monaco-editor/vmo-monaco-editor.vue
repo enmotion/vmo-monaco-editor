@@ -101,6 +101,10 @@ export default defineComponent({
       type: Array as PropType<{ language?: 'sql' | 'python' | 'groovy'; extra: Partial<VmoMonacoContext> }[]>,
       default: () => []
     },
+    disabled: {
+      type: Boolean as PropType<boolean>,
+      default: false
+    },
     monacoOptions: {
       // monaco-editor 配置
       type: Object as PropType<
@@ -159,10 +163,12 @@ export default defineComponent({
       { immediate: true, deep: true }
     )
     watch(
-      () => computedMonacoEditorOption.value,
+      () => [props.disabled, computedMonacoEditorOption.value],
       n => {
         if (n) {
-          monacoEditorInstance.value?.updateOptions(computedMonacoEditorOption.value)
+          monacoEditorInstance.value?.updateOptions(
+            mergeDeepRight(computedMonacoEditorOption.value, { readOnly: props.disabled })
+          )
           // initMonacoEditor(innerValue.value)
         }
       }
