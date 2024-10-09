@@ -1,6 +1,6 @@
 # vmo-monaco-editor
 
-`vmo-monaco-editor` 是基于 [vue3](https://vuejs.org/) 对 [monaco-editor](https://microsoft.github.io/monaco-editor/) 的再次封装；可在实际项目开发中简便的引入 `monaco-editor`
+`vmo-monaco-editor` 是基于 [vue3](https://vuejs.org/) 对 [monaco-editor](https://microsoft.github.io/monaco-editor/) 的再次封装；可在 vue3 项目中，以组件的方式便捷的引入 `monaco-editor`
 
 ## 安装
 
@@ -107,6 +107,16 @@ props: {
     // 全屏模式时，其z-index 的值
     type: Number as PropType<number>,
     default: 99
+  },
+  remindConfig: {
+    // 提示词配置
+    type: Array as PropType<{ language?: 'sql' | 'python' | 'groovy'; extra: Partial<VmoMonacoContext> }[]>,
+    default: () => []
+  },
+  disabled: {
+    // 是否禁用
+    type: Boolean as PropType<boolean>,
+    default: false
   },
   monacoOptions: {
     // monaco-editor 配置

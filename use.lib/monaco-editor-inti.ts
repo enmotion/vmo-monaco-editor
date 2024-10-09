@@ -33,7 +33,7 @@ export const computedCompletionItems = (
     suggestions.push({
       label: keyword,
       kind: Monaco.languages.CompletionItemKind.Keyword,
-      insertText: keyword,
+      insertText: `${keyword}`,
       range: range
     })
   )
