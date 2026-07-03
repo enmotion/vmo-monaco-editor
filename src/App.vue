@@ -152,7 +152,7 @@ const remindConfig = ref([
       </vmo-monaco-editor>
       <vmo-monaco-diff-editor
         ref="vmoMonacoDiffEditorInstance"
-        v-model:original-value="codeContent"
+        v-model:original-value="originalContent"
         v-model:modified-value="modifiedContent"
         :monaco-options="{
           theme: 'vs-light',
