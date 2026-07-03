@@ -93,24 +93,33 @@ import 'monaco-editor/esm/vs/basic-languages/javascript/javascript.contribution'
 import type { PropType } from 'vue'
 import * as Monaco from 'monaco-editor'
 import { vmoMonacoEditorDefaultOption } from '../vmo-monaco-editor/config'
+import {
+  applyLineChange as applyReviewLineChange,
+  createReviewActionMaps,
+  getNativeDiffAction,
+  getReviewActionIndex
+} from './review'
+import type {
+  VmoMonacoAnyDiffEditor,
+  VmoMonacoDiffChangePayload,
+  VmoMonacoDiffConfirmPayload,
+  VmoMonacoDiffDisplayMode,
+  VmoMonacoDiffEditor,
+  VmoMonacoDiffReviewActionPayload,
+  VmoMonacoDiffViewMode,
+  VmoMonacoNormalEditor,
+  VmoMonacoReviewAction,
+  VmoMonacoReviewActionMaps,
+  VmoMonacoReviewSide
+} from './types'
 
-export type VmoMonacoDiffDisplayMode = 'original' | 'modified' | 'diff'
-export type VmoMonacoDiffViewMode = 'side-by-side' | 'inline'
-export type VmoMonacoDiffChangePayload = {
-  originalValue: string
-  modifiedValue: string
-}
-export type VmoMonacoDiffConfirmPayload = VmoMonacoDiffChangePayload & {
-  confirmedValue: string
-}
-export type VmoMonacoDiffReviewActionPayload = VmoMonacoDiffChangePayload & {
-  index?: number
-  lineChange?: Monaco.editor.ILineChange
-}
-
-type NormalEditor = Monaco.editor.IStandaloneCodeEditor
-type DiffEditor = Monaco.editor.IStandaloneDiffEditor
-type AnyEditor = NormalEditor | DiffEditor
+export type {
+  VmoMonacoDiffChangePayload,
+  VmoMonacoDiffConfirmPayload,
+  VmoMonacoDiffDisplayMode,
+  VmoMonacoDiffReviewActionPayload,
+  VmoMonacoDiffViewMode
+} from './types'
 
 export default defineComponent({
   name: 'vmo-monaco-diff-editor',
@@ -201,22 +210,41 @@ export default defineComponent({
     'mode-change'
   ],
   setup(props, context) {
+    // ===== 容器状态 =====
+    // 这些状态控制组件外壳，与 Monaco model 内容无关。
     const isFullScreen = ref(false as any)
     const MonacoEditorRef = shallowRef(null as any)
-    const monacoEditorInstance = shallowRef(null as AnyEditor | null)
+    const monacoEditorInstance = shallowRef(null as VmoMonacoAnyDiffEditor | null)
+
+    // ===== 文本模型 =====
+    // originalModel 表示当前确认稿；modifiedModel 表示当前候选稿。
+    // 两端审阅操作只在这两个 model 之间移动内容，不额外保存 base 版本。
     const originalModel = shallowRef(null as Monaco.editor.ITextModel | null)
     const modifiedModel = shallowRef(null as Monaco.editor.ITextModel | null)
+
+    // ===== 视图模式 =====
+    // displayMode 控制只看确认稿、只看候选稿、或进入 diff 审阅。
+    // diffViewMode 只影响 diff 模式下的并排/混合渲染。
     const currentDisplayMode = ref(props.displayMode)
     const currentDiffViewMode = ref(props.diffViewMode)
+
+    // ===== 审阅状态 =====
+    // lineChanges 来自 Monaco diff 结果；reviewActionMaps 负责把原生 +/- 点击映射回 change index。
     const lineChanges = ref([] as Monaco.editor.ILineChange[])
-    const originalAcceptLineMap = ref({} as Record<number, number>)
-    const originalRejectLineMap = ref({} as Record<number, number>)
-    const modifiedAcceptLineMap = ref({} as Record<number, number>)
-    const modifiedRejectLineMap = ref({} as Record<number, number>)
+    const reviewActionMaps = ref(createEmptyReviewActionMaps())
+
+    // ===== 内容缓存 =====
+    // needConfirm=false 时 model 变化会立刻同步；needConfirm=true 时由 confirm/commit 输出。
     const originalInnerValue = ref('')
     const modifiedInnerValue = ref('')
+
+    // ===== 资源释放 =====
+    // Monaco editor/model 的事件都要手动 dispose，避免模式切换后重复触发。
     const editorDisposables = ref([] as Monaco.IDisposable[])
     const modelDisposables = ref([] as Monaco.IDisposable[])
+
+    // ===== Monaco 配置 =====
+    // 普通配置用于单栏 editor 和 diff editor 内部两侧 editor；diff 配置只用于 diff editor。
     const monacoEditorOptions = ref(
       {} as Partial<Monaco.editor.IStandaloneEditorConstructionOptions & { theme: 'vs-dark' | 'vs-light' }>
     )
@@ -322,6 +350,8 @@ export default defineComponent({
       }
     )
 
+    // 初始化时先创建两个稳定 model，再根据 displayMode 创建对应 editor view。
+    // 后续切模式只销毁/重建 editor view，不销毁 model，避免丢失用户编辑内容。
     onMounted(() => {
       initModels()
       nextTick(() => {
@@ -333,6 +363,7 @@ export default defineComponent({
       disposeModels()
     })
 
+    // 创建 original/modified 两个 model，并监听内容变化同步到内部缓存。
     function initModels() {
       originalInnerValue.value = props.originalValue
       modifiedInnerValue.value = props.modifiedValue
@@ -358,6 +389,8 @@ export default defineComponent({
       ]
     }
 
+    // 根据当前 displayMode 创建普通 editor 或 diff editor。
+    // 普通模式绑定单个 model；diff 模式绑定 original + modified 两个 model。
     function refreshMonacoEditor() {
       disposeEditor()
       if (!MonacoEditorRef.value || !originalModel.value || !modifiedModel.value) return
@@ -394,7 +427,8 @@ export default defineComponent({
       lineChanges.value = []
     }
 
-    function bindNormalEditorEvents(editor: NormalEditor) {
+    // 普通 editor 与 diff 的 modified editor 共用焦点/失焦事件绑定。
+    function bindNormalEditorEvents(editor: VmoMonacoNormalEditor) {
       editorDisposables.value.push(
         editor.onDidFocusEditorText(() => {
           context.emit('focuse')
@@ -406,7 +440,8 @@ export default defineComponent({
       )
     }
 
-    function bindDiffEditorEvents(editor: DiffEditor) {
+    // diff editor 额外监听 diff 结果更新，并绑定原生 +/- 点击事件。
+    function bindDiffEditorEvents(editor: VmoMonacoDiffEditor) {
       editorDisposables.value.push(
         editor.onDidUpdateDiff(() => {
           refreshLineChanges()
@@ -421,6 +456,7 @@ export default defineComponent({
       )
     }
 
+    // 热更新当前 editor view 的选项，避免只因为配置变化就销毁重建 editor。
     function updateCurrentEditorOptions() {
       const instance = monacoEditorInstance.value
       if (!instance) return
@@ -473,125 +509,37 @@ export default defineComponent({
       emitChange()
     }
 
+    // 从 Monaco diff editor 读取最新差异块。
     function refreshLineChanges() {
       const editor = getDiffEditor()
       lineChanges.value = editor?.getLineChanges() || []
     }
 
+    // 生成原生 +/- 点击到 lineChanges index 的映射。
     function refreshReviewActionMaps() {
-      const editor = getDiffEditor()
-      if (!editor || !props.showReviewActions) return
-      const originalAcceptMap = {} as Record<number, number>
-      const originalRejectMap = {} as Record<number, number>
-      const modifiedAcceptMap = {} as Record<number, number>
-      const modifiedRejectMap = {} as Record<number, number>
-
-      lineChanges.value.forEach((lineChange, index) => {
-        const originalLineNumber = getReviewActionLineNumber(originalModel.value, lineChange.originalStartLineNumber, lineChange.originalEndLineNumber)
-        const modifiedLineNumber = getReviewActionLineNumber(modifiedModel.value, lineChange.modifiedStartLineNumber, lineChange.modifiedEndLineNumber)
-
-        if (modifiedLineNumber) {
-          modifiedAcceptMap[modifiedLineNumber] = index
-        } else if (originalLineNumber) {
-          originalAcceptMap[originalLineNumber] = index
-        }
-
-        if (originalLineNumber) {
-          originalRejectMap[originalLineNumber] = index
-          // Inline diff can render both deleted and inserted lines inside the modified editor.
-          // Keep a mirrored mapping so clicks on Monaco's native '-' marker still resolve.
-          modifiedRejectMap[originalLineNumber] = index
-        } else if (modifiedLineNumber) {
-          modifiedRejectMap[modifiedLineNumber] = index
-        }
-      })
-
-      originalAcceptLineMap.value = originalAcceptMap
-      originalRejectLineMap.value = originalRejectMap
-      modifiedAcceptLineMap.value = modifiedAcceptMap
-      modifiedRejectLineMap.value = modifiedRejectMap
+      if (!getDiffEditor() || !props.showReviewActions) return
+      reviewActionMaps.value = createReviewActionMaps(lineChanges.value, originalModel.value, modifiedModel.value)
     }
 
     function clearReviewActionMaps() {
-      originalAcceptLineMap.value = {}
-      originalRejectLineMap.value = {}
-      modifiedAcceptLineMap.value = {}
-      modifiedRejectLineMap.value = {}
+      reviewActionMaps.value = createEmptyReviewActionMaps()
     }
 
-    function getReviewActionLineNumber(model: Monaco.editor.ITextModel | null, startLineNumber: number, endLineNumber: number) {
-      if (!model) return 0
-      const lineCount = model.getLineCount()
-      if (startLineNumber > 0) return Math.min(startLineNumber, lineCount)
-      if (endLineNumber > 0) return Math.min(endLineNumber, lineCount)
-      return 0
-    }
-
-    function handleReviewActionMouseDown(event: Monaco.editor.IEditorMouseEvent, side: 'original' | 'modified') {
-      const action = getNativeDiffAction(event, side)
+    function handleReviewActionMouseDown(event: Monaco.editor.IEditorMouseEvent, side: VmoMonacoReviewSide) {
+      const action = getNativeDiffAction(event, MonacoEditorRef.value)
       if (!action) return
       const lineNumber = event.target.position?.lineNumber || event.target.range?.startLineNumber
       if (!lineNumber) return
-      const acceptIndex =
-        side == 'original'
-          ? originalAcceptLineMap.value[lineNumber]
-          : modifiedAcceptLineMap.value[lineNumber] ?? findNearestLineChangeIndex(lineNumber, 'modified')
-      const rejectIndex =
-        side == 'original'
-          ? originalRejectLineMap.value[lineNumber] ?? findNearestLineChangeIndex(lineNumber, 'original')
-          : modifiedRejectLineMap.value[lineNumber] ?? findNearestLineChangeIndex(lineNumber, 'modified')
-      if (action == 'accept' && !isNil(acceptIndex)) {
-        acceptChange(acceptIndex)
-        return
-      }
-      if (action == 'reject' && !isNil(rejectIndex)) {
-        rejectChange(rejectIndex)
-      }
-    }
-
-    function getNativeDiffAction(event: Monaco.editor.IEditorMouseEvent, side: 'original' | 'modified') {
-      const target = event.event.browserEvent.target as HTMLElement | null
-      const actionNode = findNativeDiffActionNode(target)
-      const text = actionNode?.textContent?.trim()
-      const className = actionNode?.className?.toString() || ''
-      if (text == '+') return 'accept'
-      if (text == '-') return 'reject'
-      if (className.includes('insert') || className.includes('add')) return 'accept'
-      if (className.includes('delete') || className.includes('remove')) return 'reject'
-      return null
-    }
-
-    function findNativeDiffActionNode(target: HTMLElement | null) {
-      let node = target
-      while (node && node != MonacoEditorRef.value) {
-        const text = node.textContent?.trim()
-        const className = node.className?.toString() || ''
-        if (
-          text == '+' ||
-          text == '-' ||
-          className.includes('line-insert') ||
-          className.includes('line-delete') ||
-          className.includes('char-insert') ||
-          className.includes('char-delete') ||
-          className.includes('insert-sign') ||
-          className.includes('delete-sign') ||
-          className.includes('remove')
-        ) {
-          return node
-        }
-        node = node.parentElement
-      }
-      return null
-    }
-
-    function findNearestLineChangeIndex(lineNumber: number, side: 'original' | 'modified') {
-      const index = lineChanges.value.findIndex(lineChange => {
-        const startLineNumber = side == 'original' ? lineChange.originalStartLineNumber : lineChange.modifiedStartLineNumber
-        const endLineNumber = side == 'original' ? lineChange.originalEndLineNumber : lineChange.modifiedEndLineNumber
-        if (startLineNumber == 0 || endLineNumber == 0) return false
-        return lineNumber >= startLineNumber && lineNumber <= endLineNumber
+      const index = getReviewActionIndex({
+        action,
+        side,
+        lineNumber,
+        maps: reviewActionMaps.value,
+        lineChanges: lineChanges.value
       })
-      return index >= 0 ? index : undefined
+      if (!isNil(index)) {
+        applyLineChange(index, action)
+      }
     }
 
     function disposeEditor() {
@@ -611,8 +559,17 @@ export default defineComponent({
       modifiedModel.value = null
     }
 
-    function isDiffEditor(editor: AnyEditor): editor is DiffEditor {
-      return typeof (editor as DiffEditor).getModifiedEditor == 'function'
+    function isDiffEditor(editor: VmoMonacoAnyDiffEditor): editor is VmoMonacoDiffEditor {
+      return typeof (editor as VmoMonacoDiffEditor).getModifiedEditor == 'function'
+    }
+
+    function createEmptyReviewActionMaps(): VmoMonacoReviewActionMaps {
+      return {
+        originalAcceptMap: {},
+        originalRejectMap: {},
+        modifiedAcceptMap: {},
+        modifiedRejectMap: {}
+      }
     }
 
     function resetMonacoEditorOptions(options: Partial<Monaco.editor.IStandaloneEditorConstructionOptions>) {
@@ -642,6 +599,7 @@ export default defineComponent({
       } as VmoMonacoDiffConfirmPayload)
     }
 
+    // 全量接受：当前候选稿完整覆盖当前确认稿。
     function acceptAllChanges() {
       const nextValue = modifiedModel.value?.getValue() || ''
       setModelValue(originalModel.value, nextValue)
@@ -655,6 +613,7 @@ export default defineComponent({
       })
     }
 
+    // 全量拒绝：当前确认稿完整覆盖当前候选稿。
     function rejectAllChanges() {
       const nextValue = originalModel.value?.getValue() || ''
       setModelValue(modifiedModel.value, nextValue)
@@ -676,23 +635,17 @@ export default defineComponent({
       applyLineChange(index, 'reject')
     }
 
-    function applyLineChange(index: number, action: 'accept' | 'reject') {
-      const lineChange = lineChanges.value[index]
-      if (!lineChange || !originalModel.value || !modifiedModel.value) return
-      const sourceModel = action == 'accept' ? modifiedModel.value : originalModel.value
-      const targetModel = action == 'accept' ? originalModel.value : modifiedModel.value
-      const sourceRange = action == 'accept'
-        ? getLineChangeRange(sourceModel, lineChange.modifiedStartLineNumber, lineChange.modifiedEndLineNumber)
-        : getLineChangeRange(sourceModel, lineChange.originalStartLineNumber, lineChange.originalEndLineNumber)
-      const targetRange = action == 'accept'
-        ? getLineChangeRange(targetModel, lineChange.originalStartLineNumber, lineChange.originalEndLineNumber)
-        : getLineChangeRange(targetModel, lineChange.modifiedStartLineNumber, lineChange.modifiedEndLineNumber)
-      targetModel.pushEditOperations([], [
+    function applyLineChange(index: number, action: VmoMonacoReviewAction) {
+      const lineChange = applyReviewLineChange(
         {
-          range: targetRange,
-          text: sourceModel.getValueInRange(sourceRange)
-        }
-      ], () => null)
+          lineChanges: lineChanges.value,
+          originalModel: originalModel.value,
+          modifiedModel: modifiedModel.value
+        },
+        index,
+        action
+      )
+      if (!lineChange) return
       nextTick(() => {
         emitModelValues()
         refreshLineChanges()
@@ -703,22 +656,6 @@ export default defineComponent({
           modifiedValue: modifiedInnerValue.value
         } as VmoMonacoDiffReviewActionPayload)
       })
-    }
-
-    function getLineChangeRange(model: Monaco.editor.ITextModel, startLineNumber: number, endLineNumber: number) {
-      const lineCount = model.getLineCount()
-      if (startLineNumber == 0 || endLineNumber == 0) {
-        const targetLine = Math.min(Math.max(startLineNumber || endLineNumber || 1, 1), lineCount)
-        return new Monaco.Range(targetLine, 1, targetLine, 1)
-      }
-      const safeStartLineNumber = Math.min(Math.max(startLineNumber, 1), lineCount)
-      const safeEndLineNumber = Math.min(Math.max(endLineNumber, safeStartLineNumber), lineCount)
-      return new Monaco.Range(
-        safeStartLineNumber,
-        1,
-        safeEndLineNumber,
-        model.getLineMaxColumn(safeEndLineNumber)
-      )
     }
 
     function changeLanguage(language: string) {
