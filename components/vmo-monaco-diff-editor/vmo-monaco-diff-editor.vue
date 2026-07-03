@@ -514,7 +514,8 @@ export default defineComponent({
         side,
         lineNumber,
         maps: reviewActionMaps.value,
-        lineChanges: lineChanges.value
+        lineChanges: lineChanges.value,
+        diffEditor: getDiffEditor()
       })
       if (!isNil(index)) {
         applyLineChange(index, action)

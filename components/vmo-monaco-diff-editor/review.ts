@@ -28,28 +28,23 @@ export function createReviewActionMaps(
   }
 
   lineChanges.forEach((lineChange, index) => {
-    const originalLineNumber = getReviewActionLineNumber(
-      originalModel,
-      lineChange.originalStartLineNumber,
-      lineChange.originalEndLineNumber
-    )
-    const modifiedLineNumber = getReviewActionLineNumber(
-      modifiedModel,
-      lineChange.modifiedStartLineNumber,
-      lineChange.modifiedEndLineNumber
-    )
+    const originalLineNumbers = getLineChangeOriginalLineNumbers(lineChange, originalModel)
+    const modifiedLineNumbers = getLineChangeModifiedLineNumbers(lineChange, modifiedModel)
+    const originalLineNumber = originalLineNumbers[0]
+    const modifiedLineNumber = modifiedLineNumbers[0]
 
     if (modifiedLineNumber) {
-      maps.modifiedAcceptMap[modifiedLineNumber] = index
+      addReviewActionMapEntries(maps.modifiedAcceptMap, modifiedLineNumbers, index)
     } else if (originalLineNumber) {
-      maps.originalAcceptMap[originalLineNumber] = index
+      addReviewActionMapEntries(maps.originalAcceptMap, originalLineNumbers, index)
     }
 
     if (originalLineNumber) {
-      maps.originalRejectMap[originalLineNumber] = index
-      maps.modifiedRejectMap[originalLineNumber] = index
+      addReviewActionMapEntries(maps.originalRejectMap, originalLineNumbers, index)
+      addReviewActionMapEntries(maps.modifiedRejectMap, originalLineNumbers, index)
+      addReviewActionMapEntries(maps.modifiedRejectMap, modifiedLineNumbers, index)
     } else if (modifiedLineNumber) {
-      maps.modifiedRejectMap[modifiedLineNumber] = index
+      addReviewActionMapEntries(maps.modifiedRejectMap, modifiedLineNumbers, index)
     }
   })
 
@@ -173,25 +168,162 @@ export function getReviewActionLineNumber(
   startLineNumber: number,
   endLineNumber: number
 ) {
-  if (!model) return 0
+  return getReviewActionLineNumbers(model, startLineNumber, endLineNumber)[0] || 0
+}
+
+export function getReviewActionLineNumbers(
+  model: Monaco.editor.ITextModel | null,
+  startLineNumber: number,
+  endLineNumber: number
+) {
+  if (!model) return []
   const lineCount = model.getLineCount()
-  if (startLineNumber > 0) return Math.min(startLineNumber, lineCount)
-  if (endLineNumber > 0) return Math.min(endLineNumber, lineCount)
-  return 0
+  if (startLineNumber <= 0 && endLineNumber <= 0) return []
+  const safeStartLineNumber = Math.min(Math.max(startLineNumber || endLineNumber, 1), lineCount)
+  const safeEndLineNumber = Math.min(Math.max(endLineNumber || startLineNumber, safeStartLineNumber), lineCount)
+  const lineNumbers = [] as number[]
+  for (let lineNumber = safeStartLineNumber; lineNumber <= safeEndLineNumber; lineNumber++) {
+    lineNumbers.push(lineNumber)
+  }
+  return lineNumbers
+}
+
+export function getLineChangeOriginalLineNumbers(
+  lineChange: Monaco.editor.ILineChange,
+  model: Monaco.editor.ITextModel | null
+) {
+  return uniqueLineNumbers([
+    ...getReviewActionLineNumbers(model, lineChange.originalStartLineNumber, lineChange.originalEndLineNumber),
+    ...getCharChangeLineNumbers(lineChange.charChanges, model, 'original')
+  ])
+}
+
+export function getLineChangeModifiedLineNumbers(
+  lineChange: Monaco.editor.ILineChange,
+  model: Monaco.editor.ITextModel | null
+) {
+  return uniqueLineNumbers([
+    ...getReviewActionLineNumbers(model, lineChange.modifiedStartLineNumber, lineChange.modifiedEndLineNumber),
+    ...getCharChangeLineNumbers(lineChange.charChanges, model, 'modified')
+  ])
+}
+
+export function getCharChangeLineNumbers(
+  charChanges: Monaco.editor.ICharChange[] | undefined,
+  model: Monaco.editor.ITextModel | null,
+  side: VmoMonacoReviewSide
+) {
+  if (!charChanges) return []
+  return charChanges.flatMap(charChange => {
+    return side == 'original'
+      ? getReviewActionLineNumbers(model, charChange.originalStartLineNumber, charChange.originalEndLineNumber)
+      : getReviewActionLineNumbers(model, charChange.modifiedStartLineNumber, charChange.modifiedEndLineNumber)
+  })
+}
+
+export function uniqueLineNumbers(lineNumbers: number[]) {
+  return [...new Set(lineNumbers)].filter(lineNumber => lineNumber > 0)
+}
+
+export function addReviewActionMapEntries(map: Record<number, number>, lineNumbers: number[], index: number) {
+  lineNumbers.forEach(lineNumber => {
+    map[lineNumber] = index
+  })
 }
 
 export function findNearestLineChangeIndex(
   lineChanges: Monaco.editor.ILineChange[],
   lineNumber: number,
-  side: VmoMonacoReviewSide
+  side: VmoMonacoReviewSide,
+  action?: VmoMonacoReviewAction
 ) {
   const index = lineChanges.findIndex(lineChange => {
     const startLineNumber = side == 'original' ? lineChange.originalStartLineNumber : lineChange.modifiedStartLineNumber
     const endLineNumber = side == 'original' ? lineChange.originalEndLineNumber : lineChange.modifiedEndLineNumber
-    if (startLineNumber == 0 || endLineNumber == 0) return false
-    return lineNumber >= startLineNumber && lineNumber <= endLineNumber
+    if (isLineNumberInRange(lineNumber, startLineNumber, endLineNumber)) return true
+
+    // Inline diff renders deleted original lines in the modified editor.
+    // A click on "-" can therefore report the original line number while the event side is "modified".
+    return side == 'modified' && action == 'reject'
+      ? isLineNumberInRange(lineNumber, lineChange.originalStartLineNumber, lineChange.originalEndLineNumber)
+      : false
   })
   return index >= 0 ? index : undefined
+}
+
+export function findLineChangeIndexBySideLineNumber(
+  lineChanges: Monaco.editor.ILineChange[],
+  lineNumber: number,
+  side: VmoMonacoReviewSide
+) {
+  if (lineNumber <= 0) return undefined
+  const index = lineChanges.findIndex(lineChange => {
+    return isLineNumberInLineChange(lineChange, lineNumber, side)
+  })
+  return index >= 0 ? index : undefined
+}
+
+export function isLineNumberInLineChange(
+  lineChange: Monaco.editor.ILineChange,
+  lineNumber: number,
+  side: VmoMonacoReviewSide
+) {
+  const startLineNumber = side == 'original' ? lineChange.originalStartLineNumber : lineChange.modifiedStartLineNumber
+  const endLineNumber = side == 'original' ? lineChange.originalEndLineNumber : lineChange.modifiedEndLineNumber
+  if (isLineNumberInRange(lineNumber, startLineNumber, endLineNumber)) return true
+
+  return (lineChange.charChanges || []).some(charChange => {
+    const charStartLineNumber = side == 'original' ? charChange.originalStartLineNumber : charChange.modifiedStartLineNumber
+    const charEndLineNumber = side == 'original' ? charChange.originalEndLineNumber : charChange.modifiedEndLineNumber
+    return isLineNumberInRange(lineNumber, charStartLineNumber, charEndLineNumber)
+  })
+}
+
+export function isLineNumberInRange(lineNumber: number, startLineNumber: number, endLineNumber: number) {
+  if (startLineNumber == 0 || endLineNumber == 0) return false
+  return lineNumber >= startLineNumber && lineNumber <= endLineNumber
+}
+
+export function getReviewActionIndexFromDiffLineInformation(params: {
+  action: VmoMonacoReviewAction
+  side: VmoMonacoReviewSide
+  lineNumber: number
+  lineChanges: Monaco.editor.ILineChange[]
+  diffEditor: Monaco.editor.IStandaloneDiffEditor | null
+}) {
+  if (!params.diffEditor) return undefined
+
+  const diffLineInformation =
+    params.side == 'original'
+      ? params.diffEditor.getDiffLineInformationForOriginal(params.lineNumber)
+      : params.diffEditor.getDiffLineInformationForModified(params.lineNumber)
+  const equivalentLineNumber = diffLineInformation?.equivalentLineNumber || 0
+
+  const candidates =
+    params.side == 'modified' && params.action == 'reject'
+      ? [
+          { side: 'original' as const, lineNumber: equivalentLineNumber },
+          { side: 'modified' as const, lineNumber: params.lineNumber },
+          { side: 'original' as const, lineNumber: params.lineNumber },
+          { side: 'original' as const, lineNumber: params.lineNumber + 1 },
+          { side: 'modified' as const, lineNumber: params.lineNumber + 1 }
+        ]
+      : params.side == 'modified'
+        ? [
+            { side: 'modified' as const, lineNumber: params.lineNumber },
+            { side: 'original' as const, lineNumber: equivalentLineNumber }
+          ]
+        : [
+            { side: 'original' as const, lineNumber: params.lineNumber },
+            { side: 'modified' as const, lineNumber: equivalentLineNumber }
+          ]
+
+  for (const candidate of candidates) {
+    const index = findLineChangeIndexBySideLineNumber(params.lineChanges, candidate.lineNumber, candidate.side)
+    if (!isNil(index)) return index
+  }
+
+  return undefined
 }
 
 export function getReviewActionIndex(params: {
@@ -200,7 +332,17 @@ export function getReviewActionIndex(params: {
   lineNumber: number
   maps: VmoMonacoReviewActionMaps
   lineChanges: Monaco.editor.ILineChange[]
+  diffEditor?: Monaco.editor.IStandaloneDiffEditor | null
 }) {
+  const diffLineInformationIndex = getReviewActionIndexFromDiffLineInformation({
+    action: params.action,
+    side: params.side,
+    lineNumber: params.lineNumber,
+    lineChanges: params.lineChanges,
+    diffEditor: params.diffEditor || null
+  })
+  if (!isNil(diffLineInformationIndex)) return diffLineInformationIndex
+
   const directIndex =
     params.action == 'accept'
       ? params.side == 'original'
@@ -212,5 +354,13 @@ export function getReviewActionIndex(params: {
 
   if (!isNil(directIndex)) return directIndex
 
-  return findNearestLineChangeIndex(params.lineChanges, params.lineNumber, params.side)
+  if (params.side == 'modified' && params.action == 'reject') {
+    const nextLineIndex =
+      params.maps.modifiedRejectMap[params.lineNumber + 1] ??
+      params.maps.originalRejectMap[params.lineNumber + 1] ??
+      findNearestLineChangeIndex(params.lineChanges, params.lineNumber + 1, params.side, params.action)
+    if (!isNil(nextLineIndex)) return nextLineIndex
+  }
+
+  return findNearestLineChangeIndex(params.lineChanges, params.lineNumber, params.side, params.action)
 }

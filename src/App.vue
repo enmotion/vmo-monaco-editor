@@ -119,9 +119,9 @@ const remindConfig = ref([
       <textarea v-model="modifiedContent" class="border h-[180px] mt-[10px] text-xs" />
     </div>
     <div class="flex-col flex grow w-0">
-      {{ codeContent }}
+      {{ originalContent }}
       {{ codeContent2 }}
-      <vmo-monaco-editor
+      <!-- <vmo-monaco-editor
         ref="vmoMonacoEditorInstance"
         :model-value="codeContent"
         prefix="aaa"
@@ -149,7 +149,7 @@ const remindConfig = ref([
             fullScreen: true
             // languages: ['css', 'typescript', 'sql']
           }"></vmo-monaco-ui>
-      </vmo-monaco-editor>
+      </vmo-monaco-editor> -->
       <vmo-monaco-diff-editor
         ref="vmoMonacoDiffEditorInstance"
         v-model:original-value="originalContent"
@@ -163,7 +163,7 @@ const remindConfig = ref([
             enabled: false
           }
         }"
-        :need-confirm="true"
+        :need-confirm="false"
         :display-mode="diffDisplayMode"
         :diff-view-mode="diffViewMode"
         :editable-original="true"
@@ -183,7 +183,7 @@ const remindConfig = ref([
           <div class="flex-row flex grow items-center justify-between">
             <div>aaa</div>
             <div class="flex-row flex h-[20px]">
-              <commit-button></commit-button>
+              <!-- <commit-button></commit-button> -->
               <minimap-toggle></minimap-toggle>
               <diff-review></diff-review>
               <fontSizeInput class="h-[20px]"></fontSizeInput>
