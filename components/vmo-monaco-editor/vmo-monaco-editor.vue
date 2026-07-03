@@ -1,4 +1,8 @@
 <template>
+  <!--
+    全屏时把编辑器整体 Teleport 到 body，避免被父级 overflow / transform / z-index 限制。
+    非全屏时 disabled Teleport，保持组件仍在原始布局流里。
+  -->
   <Teleport to="body" :disabled="!isFullScreen">
     <div
       :class="[
@@ -8,7 +12,9 @@
         isFullScreen ? 'isFullScreen' : ''
       ]"
       :style="mergeDeepRight(context.attrs?.style || {}, isFullScreen ? { zIndex: zIndex } : {})">
+      <!-- 默认插槽通常用于注入 vmo-monaco-ui 或用户自定义工具栏。 -->
       <slot v-if="context.slots.default"></slot>
+      <!-- prefix/suffix 是编辑器外部的附加展示内容，不进入 Monaco model。 -->
       <slot v-if="!!prefix || context.slots.prefix" name="prefix" :option="computedMonacoEditorOption">
         <div :class="['prefix']">
           <span v-html="prefix" class="extra-code"></span>
@@ -115,14 +121,20 @@ export default defineComponent({
   },
   emits: ['change', 'update:modelValue', 'focuse', 'blur'],
   setup(props, context) {
+    // 全屏只影响组件容器位置，不直接改变 Monaco 实例本身。
     const isFullScreen = ref(false as any)
+    // innerValue 是 Monaco 内部真实内容缓存，用于 needConfirm 场景下延迟提交。
     const innerValue = ref('')
+    // Monaco 的 DOM 容器和 editor 实例都不需要深层响应式，shallowRef 可以避免 Vue 递归代理第三方对象。
     const MonacoEditorRef = shallowRef(null as any)
     const monacoEditorInstance = shallowRef(null as null | Monaco.editor.IStandaloneCodeEditor)
+    // 自动补全 provider 需要在 remindConfig 更新时 dispose，否则会重复注册同一语言提示。
     const completionProvider = ref([] as Monaco.IDisposable[])
+    // 组件内部维护一份可变配置，来源可以是外部 props.monacoOptions，也可以是 UI 控件调用 resetMonacoEditorOptions。
     const monacoEditorOptions = ref(
       {} as Partial<Monaco.editor.IStandaloneEditorConstructionOptions & { theme: 'vs-dark' | 'vs-light' }>
     )
+    // 最终配置 = 默认配置 + 当前配置。外部和 UI 控件都只修改 monacoEditorOptions。
     const computedMonacoEditorOption = computed(() => {
       monacoEditorOptions.value
       return JSON.parse(JSON.stringify(mergeDeepRight(vmoMonacoEditorDefaultOption, monacoEditorOptions.value)))
@@ -153,6 +165,7 @@ export default defineComponent({
       },
       { immediate: true, deep: true }
     )
+    // 外部 monacoOptions 变化时，同步覆盖内部配置；equals 用来避免深层对象重复触发无意义更新。
     watch(
       () => props.monacoOptions,
       (n, o) => {
@@ -162,6 +175,8 @@ export default defineComponent({
       },
       { immediate: true, deep: true }
     )
+    // Monaco editor 创建后，大部分配置可以通过 updateOptions 热更新，不需要销毁重建。
+    // disabled 也通过 readOnly 合并进同一次 updateOptions，确保外部禁用状态立即生效。
     watch(
       () => [props.disabled, computedMonacoEditorOption.value],
       n => {
@@ -172,6 +187,17 @@ export default defineComponent({
           // initMonacoEditor(innerValue.value)
         }
       }
+    )
+    // theme 在 Monaco 内部是全局状态，不能只依赖 updateOptions。
+    // 这里单独监听最终 theme，保证外部 monacoOptions.theme 或 UI 控件切换后，Monaco 内部主题也同步变化。
+    watch(
+      () => computedMonacoEditorOption.value.theme,
+      theme => {
+        if (theme) {
+          Monaco.editor.setTheme(theme)
+        }
+      },
+      { immediate: true }
     )
     // 当外部内容属性变化时，及时更新内部的编辑内容
     watch(
@@ -187,6 +213,7 @@ export default defineComponent({
       }
     )
     onMounted(() => {
+      // 避免热更新或重复挂载时残留旧实例。
       monacoEditorInstance.value?.dispose()
       initMonacoEditor(props.modelValue)
     })
@@ -197,6 +224,7 @@ export default defineComponent({
     function initMonacoEditor(codeValue: string) {
       innerValue.value = codeValue
       monacoEditorInstance.value?.dispose()
+      // create 只在初始化/刷新时执行；后续配置变更优先走 updateOptions。
       monacoEditorInstance.value = Monaco.editor.create(
         MonacoEditorRef.value,
         mergeDeepRight(computedMonacoEditorOption.value as Monaco.editor.IStandaloneEditorConstructionOptions, {
@@ -248,6 +276,8 @@ export default defineComponent({
     }
     /**
      * 重置MonacoEditor的配置
+     * 这是暴露给 vmo-monaco-ui 和各个 control 小组件的统一配置入口。
+     * 小组件不直接操作 monacoEditorInstance，而是通过这里修改内部配置，再由 watcher 统一同步到 Monaco。
      * @param options 配置
      */
     function resetMonacoEditorOptions(options: Partial<Monaco.editor.IStandaloneEditorConstructionOptions>) {
@@ -269,7 +299,8 @@ export default defineComponent({
       isFullScreen.value = !isFullScreen.value
     }
     /**
-     * 全屏切换
+     * 提交当前 Monaco 内容。
+     * needConfirm=true 时，编辑过程不会实时 update:modelValue，外部需要通过 commit 主动取值。
      */
     function commit() {
       context.emit('update:modelValue', innerValue.value)
@@ -283,6 +314,8 @@ export default defineComponent({
       const model = monacoEditorInstance.value?.getModel()
       !!model && Monaco.editor.setModelLanguage(model, language)
     }
+    // setup return 的这些字段就是组件实例 ref 能访问到的 public API。
+    // vmo-monaco-ui 和 controls 会依赖这层 API，而不是直接触碰 Monaco 原始实例。
     return {
       context,
       MonacoEditorRef,

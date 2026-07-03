@@ -75,7 +75,7 @@ const remindConfig = ref([
         disabled :{{ disabled }}
       </div>
     </div>
-    <div class="flex-col flex bg-red-100">
+    <div class="flex-col flex">
       <vmo-monaco-editor
         ref="vmoMonacoEditorInstance"
         :model-value="codeContent"
@@ -88,14 +88,14 @@ const remindConfig = ref([
         }"
         :disabled="disabled"
         :bidibind="true"
-        :need-confirm="false"
+        :need-confirm="true"
         :remind-config="remindConfig"
         class="w-[800px] flex-grow"
         @update:modelValue="codeContent = $event"
         @change="codeContent = $event">
         <vmo-monaco-ui
           title="Coding-Sql"
-          :monaco="vmoMonacoEditorInstance"
+          :monaco="[vmoMonacoEditorInstance,vmoMonacoEditorInstance2]"
           :config="{
             theme: true,
             lineNumbers: true,
@@ -123,7 +123,7 @@ const remindConfig = ref([
             extra: {}
           }
         ]"
-        class="w-[800px] flex-grow border-t"
+        class="w-[800px] flex-grow border-t border-t-[#88888844]"
         @update:modelValue="codeContent2 = $event"
         @change="codeContent2 = $event">
         <vmo-monaco-ui
