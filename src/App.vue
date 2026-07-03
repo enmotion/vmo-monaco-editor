@@ -2,6 +2,10 @@
 import { ref } from 'vue'
 import { VmoMonacoDiffEditor, VmoMonacoEditor, VmoMonacoUi, useReminderPlugin } from '../index'
 import * as Monaco from 'monaco-editor'
+import fontSizeInput from '@comps/vmo-monaco-ui/controls/font-size-input.vue'
+import themeToggle from '@comps/vmo-monaco-ui/controls/theme-toggle.vue'
+import minimapToggle from '@comps/vmo-monaco-ui/controls/minimap-toggle.vue'
+import diffReview from '@comps/vmo-monaco-ui/controls/diff-review.vue'
 // initMonacoEnvironment()
 const codeContent = ref('SELECT * FROM table_name')
 const codeContent2 = ref('SELECT * FROM table_name')
@@ -59,7 +63,7 @@ const remindConfig = ref([
 
 <template>
   <div class="flex flex-row grow-1 h-full">
-    <div class="flex-col flex flex-grow w-1/5 bg-white border p-[10px]">
+    <div class="flex-col flex w-[400px] bg-white border p-[10px]">
       <textarea v-model="codeContent" class="border h-[200px]" :rows="4" />
       <div
         @click="
@@ -113,7 +117,8 @@ const remindConfig = ref([
       <textarea v-model="originalContent" class="border h-[180px] mt-[10px] text-xs" />
       <textarea v-model="modifiedContent" class="border h-[180px] mt-[10px] text-xs" />
     </div>
-    <div class="flex-col flex grow">
+    <div class="flex-col flex grow w-0">
+      {{ codeContent }}
       <vmo-monaco-editor
         ref="vmoMonacoEditorInstance"
         :model-value="codeContent"
@@ -126,7 +131,7 @@ const remindConfig = ref([
         }"
         :disabled="disabled"
         :bidibind="true"
-        :need-confirm="true"
+        :need-confirm="false"
         :remind-config="remindConfig"
         class="flex-grow"
         @update:modelValue="codeContent = $event"
@@ -145,7 +150,7 @@ const remindConfig = ref([
       </vmo-monaco-editor>
       <vmo-monaco-diff-editor
         ref="vmoMonacoDiffEditorInstance"
-        v-model:original-value="originalContent"
+        v-model:original-value="codeContent"
         v-model:modified-value="modifiedContent"
         :monaco-options="{
           theme: 'vs-light',
@@ -163,7 +168,7 @@ const remindConfig = ref([
         class="flex-grow border-t border-t-[#88888844]">
         <vmo-monaco-ui
           title="Text-Diff"
-          :monaco="vmoMonacoDiffEditorInstance"
+          :monaco="[vmoMonacoDiffEditorInstance,vmoMonacoEditorInstance]"
           :config="{
             theme: true,
             lineNumbers: true,
@@ -171,7 +176,18 @@ const remindConfig = ref([
             fontSize: true,
             fullScreen: true,
             reviewActions: true
-          }"></vmo-monaco-ui>
+          }">
+          <div class="flex-row flex grow items-center justify-between">
+            <div>aaa</div>
+            <div class="flex-row flex h-[20px]">
+              <minimap-toggle></minimap-toggle>
+              <diff-review></diff-review>
+              <fontSizeInput class="h-[20px]"></fontSizeInput>
+              <theme-toggle></theme-toggle>
+              <span @click="modifiedContent='KKEE'">aaa</span>
+            </div>
+          </div>  
+        </vmo-monaco-ui>
       </vmo-monaco-diff-editor>
       <vmo-monaco-editor
         ref="vmoMonacoEditorInstance2"

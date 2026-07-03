@@ -7,7 +7,7 @@ import VmoMonacoFullscreenToggle from '@comps/vmo-monaco-ui/controls/fullscreen-
 import VmoMonacoLanguageSelect from '@comps/vmo-monaco-ui/controls/language-select.vue'
 import VmoMonacoLineNumbersToggle from '@comps/vmo-monaco-ui/controls/line-numbers-toggle.vue'
 import VmoMonacoMinimapToggle from '@comps/vmo-monaco-ui/controls/minimap-toggle.vue'
-import VmoMonacoReviewActions from '@comps/vmo-monaco-ui/controls/review-actions.vue'
+import VmoMonacoDiffReview from '@comps/vmo-monaco-ui/controls/diff-review.vue'
 import VmoMonacoThemeToggle from '@comps/vmo-monaco-ui/controls/theme-toggle.vue'
 import sqlProvider from '@lib/languages/sql'
 import pythonProvider from '@lib/languages/python'
@@ -50,9 +50,9 @@ import type {
   VmoMonacoMinimapControlValue
 } from '@comps/vmo-monaco-ui/controls/minimap-toggle.vue'
 import type {
-  VmoMonacoReviewActionsControlConfig,
-  VmoMonacoReviewActionsControlValue
-} from '@comps/vmo-monaco-ui/controls/review-actions.vue'
+  VmoMonacoDiffReviewControlConfig,
+  VmoMonacoDiffReviewControlValue
+} from '@comps/vmo-monaco-ui/controls/diff-review.vue'
 import type {
   VmoMonacoThemeControlConfig,
   VmoMonacoThemeControlValue
@@ -98,8 +98,8 @@ export {
   VmoMonacoLineNumbersControlValue,
   VmoMonacoMinimapControlConfig,
   VmoMonacoMinimapControlValue,
-  VmoMonacoReviewActionsControlConfig,
-  VmoMonacoReviewActionsControlValue,
+  VmoMonacoDiffReviewControlConfig,
+  VmoMonacoDiffReviewControlValue,
   VmoMonacoThemeControlConfig,
   VmoMonacoThemeControlValue,
   VmoMonacoControlCommitPayload,
@@ -114,7 +114,7 @@ export {
   VmoMonacoLanguageSelect,
   VmoMonacoLineNumbersToggle,
   VmoMonacoMinimapToggle,
-  VmoMonacoReviewActions,
+  VmoMonacoDiffReview,
   VmoMonacoThemeToggle,
   useReminderPlugin
 }

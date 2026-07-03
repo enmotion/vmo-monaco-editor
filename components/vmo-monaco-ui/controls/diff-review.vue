@@ -1,5 +1,5 @@
 <template>
-  <span v-if="visible" ref="ReviewActionsRef" class="reviewActions">
+  <span ref="ReviewActionsRef" class="reviewActions">
     <span
       :class="['iconButton reviewTrigger', isOpen ? '' : '']"
       type="button"
@@ -121,13 +121,13 @@ import type * as Monaco from 'monaco-editor'
 import type { VmoMonacoDiffEditorExpose } from '@type'
 import { createVmoMonacoControlProps, useVmoMonacoControl } from './use-monaco-control'
 
-export type VmoMonacoReviewActionsControlValue = unknown
-export type VmoMonacoReviewActionsControlConfig = boolean
+export type VmoMonacoDiffReviewControlValue = unknown
+export type VmoMonacoDiffReviewControlConfig = boolean
 
 export default defineComponent({
   name: 'vmo-monaco-review-actions',
   props: {
-    ...createVmoMonacoControlProps<VmoMonacoReviewActionsControlValue, VmoMonacoReviewActionsControlConfig>()
+    ...createVmoMonacoControlProps<VmoMonacoDiffReviewControlValue, VmoMonacoDiffReviewControlConfig>()
   },
   emits: ['accept-all', 'reject-all', 'confirm', 'accept-change', 'reject-change', 'display-mode-change', 'diff-view-mode-change'],
   setup(props, context) {
@@ -141,9 +141,6 @@ export default defineComponent({
     const primaryDiffMonaco = computed(() => diffMonacos.value[0] || null)
     const lineChanges = computed(() => {
       return primaryDiffMonaco.value?.lineChanges || primaryDiffMonaco.value?.getLineChanges() || []
-    })
-    const visible = computed(() => {
-      return !!props.config && !!primaryDiffMonaco.value
     })
     const currentDisplayMode = computed(() => {
       return primaryDiffMonaco.value?.currentDisplayMode || 'diff'
@@ -230,7 +227,6 @@ export default defineComponent({
 
     return {
       ReviewActionsRef,
-      visible,
       isOpen,
       lineChanges,
       currentDisplayMode,
