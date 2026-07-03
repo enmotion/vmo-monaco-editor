@@ -1,3 +1,87 @@
-@import url('//at.alicdn.com/t/c/font_4602780_8l4eiyqqe3.css');
+@font-face {
+  font-family: "iconfont"; /* Project id 4602780 */
+  src: url('iconfont.woff2?t=1783074534105') format('woff2'),
+       url('iconfont.woff?t=1783074534105') format('woff'),
+       url('iconfont.ttf?t=1783074534105') format('truetype');
+}
 
+.iconfont {
+  font-family: "iconfont" !important;
+  font-size: 16px;
+  font-style: normal;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.vmo-compare:before {
+  content: "\e7a8";
+}
+
+.vmo-plus:before {
+  content: "\e602";
+}
+
+.vmo-sub:before {
+  content: "\e603";
+}
+
+.vmo-para:before {
+  content: "\e632";
+}
+
+.vmo-mix:before {
+  content: "\e649";
+}
+
+.vmo-split:before {
+  content: "\e6c0";
+}
+
+.vmo-modify:before {
+  content: "\e6b8";
+}
+
+.vmo-diff:before {
+  content: "\e617";
+}
+
+.vmo-cloudup:before {
+  content: "\e622";
+}
+
+.vmo-format:before {
+  content: "\e606";
+}
+
+.vmo-fontsize:before {
+  content: "\e7f7";
+}
+
+.vmo-sun:before {
+  content: "\e631";
+}
+
+.vmo-moon:before {
+  content: "\e60a";
+}
+
+.vmo-lines:before {
+  content: "\e6ee";
+}
+
+.vmo-minimap:before {
+  content: "\e600";
+}
+
+.vmo-fullscreen-exit:before {
+  content: "\e889";
+}
+
+.vmo-fullscreen:before {
+  content: "\e673";
+}
+
+.vmo-running:before {
+  content: "\e625";
+}
 
