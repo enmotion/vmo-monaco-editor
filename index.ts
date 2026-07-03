@@ -1,4 +1,5 @@
 import VmoMonacoEditor from '@comps/vmo-monaco-editor/vmo-monaco-editor.vue'
+import VmoMonacoDiffEditor from '@comps/vmo-monaco-diff-editor/vmo-monaco-diff-editor.vue'
 import VmoMonacoUi from '@comps/vmo-monaco-ui/vmo-monaco-ui.vue'
 import VmoMonacoCommitButton from '@comps/vmo-monaco-ui/controls/commit-button.vue'
 import VmoMonacoFontSizeInput from '@comps/vmo-monaco-ui/controls/font-size-input.vue'
@@ -16,8 +17,16 @@ import type {
   VmoMonacoContextMethod,
   VmoMonacoContextObject,
   VmoMonacoEditorExpose,
+  VmoMonacoDiffEditorExpose,
   VmoMonacoEditorOption
 } from '@type'
+import type {
+  VmoMonacoDiffChangePayload,
+  VmoMonacoDiffConfirmPayload,
+  VmoMonacoDiffDisplayMode,
+  VmoMonacoDiffReviewActionPayload,
+  VmoMonacoDiffViewMode
+} from '@comps/vmo-monaco-diff-editor/vmo-monaco-diff-editor.vue'
 import type { VmoMonacoCommitControlConfig, VmoMonacoCommitControlValue } from '@comps/vmo-monaco-ui/controls/commit-button.vue'
 import type {
   VmoMonacoFontSizeControlConfig,
@@ -65,7 +74,13 @@ export {
   VmoMonacoContextMethod,
   VmoMonacoContextObject,
   VmoMonacoEditorExpose,
+  VmoMonacoDiffEditorExpose,
   VmoMonacoEditorOption,
+  VmoMonacoDiffChangePayload,
+  VmoMonacoDiffConfirmPayload,
+  VmoMonacoDiffDisplayMode,
+  VmoMonacoDiffReviewActionPayload,
+  VmoMonacoDiffViewMode,
   VmoMonacoCommitControlConfig,
   VmoMonacoCommitControlValue,
   VmoMonacoFontSizeControlConfig,
@@ -84,6 +99,7 @@ export {
   VmoMonacoControlTarget,
   VmoMonacoControlTargetRef,
   VmoMonacoEditor,
+  VmoMonacoDiffEditor,
   VmoMonacoUi,
   VmoMonacoCommitButton,
   VmoMonacoFontSizeInput,

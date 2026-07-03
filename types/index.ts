@@ -32,3 +32,18 @@ export type VmoMonacoEditorExpose = {
   isFullScreen: boolean
   needConfirm: boolean
 }
+
+export type VmoMonacoDiffEditorExpose = VmoMonacoEditorExpose & {
+  resetMonacoDiffEditorOptions: (options: Partial<Monaco.editor.IStandaloneDiffEditorConstructionOptions>) => void
+  changeDisplayMode: (mode: 'original' | 'modified' | 'diff') => void
+  changeDiffViewMode: (mode: 'side-by-side' | 'inline') => void
+  acceptChange: (index: number) => void
+  rejectChange: (index: number) => void
+  acceptAllChanges: () => void
+  rejectAllChanges: () => void
+  confirm: () => void
+  getLineChanges: () => Monaco.editor.ILineChange[]
+  getOriginalEditor: () => Monaco.editor.IStandaloneCodeEditor | null
+  getModifiedEditor: () => Monaco.editor.IStandaloneCodeEditor | null
+  getDiffEditor: () => Monaco.editor.IStandaloneDiffEditor | null
+}
