@@ -6,6 +6,7 @@ import fontSizeInput from '@comps/vmo-monaco-ui/controls/font-size-input.vue'
 import themeToggle from '@comps/vmo-monaco-ui/controls/theme-toggle.vue'
 import minimapToggle from '@comps/vmo-monaco-ui/controls/minimap-toggle.vue'
 import diffReview from '@comps/vmo-monaco-ui/controls/diff-review.vue'
+import commitButton from '@comps/vmo-monaco-ui/controls/commit-button.vue'
 // initMonacoEnvironment()
 const codeContent = ref('SELECT * FROM table_name')
 const codeContent2 = ref('SELECT * FROM table_name')
@@ -161,6 +162,7 @@ const remindConfig = ref([
             enabled: false
           }
         }"
+        :need-confirm="true"
         :display-mode="diffDisplayMode"
         :diff-view-mode="diffViewMode"
         :editable-original="true"
@@ -180,6 +182,7 @@ const remindConfig = ref([
           <div class="flex-row flex grow items-center justify-between">
             <div>aaa</div>
             <div class="flex-row flex h-[20px]">
+              <commit-button></commit-button>
               <minimap-toggle></minimap-toggle>
               <diff-review></diff-review>
               <fontSizeInput class="h-[20px]"></fontSizeInput>
