@@ -34,6 +34,9 @@ export type VmoMonacoEditorExpose = {
 }
 
 export type VmoMonacoDiffEditorExpose = VmoMonacoEditorExpose & {
+  currentDisplayMode: 'original' | 'modified' | 'diff'
+  currentDiffViewMode: 'side-by-side' | 'inline'
+  lineChanges: Monaco.editor.ILineChange[]
   resetMonacoDiffEditorOptions: (options: Partial<Monaco.editor.IStandaloneDiffEditorConstructionOptions>) => void
   changeDisplayMode: (mode: 'original' | 'modified' | 'diff') => void
   changeDiffViewMode: (mode: 'side-by-side' | 'inline') => void

@@ -16,22 +16,6 @@
           <span v-html="prefix" class="extra-code"></span>
         </div>
       </slot>
-      <slot
-        v-if="showReviewActions && currentDisplayMode == 'diff'"
-        name="review-actions"
-        :line-changes="lineChanges"
-        :accept-change="acceptChange"
-        :reject-change="rejectChange"
-        :accept-all-changes="acceptAllChanges"
-        :reject-all-changes="rejectAllChanges"
-        :confirm="confirm">
-        <div class="diff-review-actions">
-          <button class="diff-review-action" type="button" @click="acceptAllChanges">全部接受</button>
-          <button class="diff-review-action" type="button" @click="rejectAllChanges">全部拒绝</button>
-          <button class="diff-review-action is-primary" type="button" @click="confirm">确认</button>
-          <span class="diff-review-count">变更 {{ lineChanges.length }} 处</span>
-        </div>
-      </slot>
       <div ref="MonacoEditorRef" class="ide-container"></div>
       <slot v-if="!!suffix || context.slots.suffix" name="suffix" :option="computedMonacoEditorOption">
         <div :class="['suffix']">
@@ -67,20 +51,11 @@
 .vmo-monaco-editor-container .ide-container {
   @apply flex flex-col h-0 flex-grow;
 }
-.vmo-monaco-editor-container .diff-review-actions {
-  @apply flex flex-row items-center gap-[6px] px-[10px] py-[6px] border-b border-[#88888830] text-xs overflow-x-auto;
-}
-.vmo-monaco-editor-container .diff-review-action {
-  @apply shrink-0 px-[8px] py-[3px] rounded border border-[#88888844] bg-[#88888810] cursor-pointer hover:bg-[#88888820];
-}
-.vmo-monaco-editor-container .diff-review-action.is-primary {
-  @apply border-[#00BB5588] text-[#00BB55];
-}
-.vmo-monaco-editor-container .diff-review-count {
-  @apply shrink-0 text-[#888888];
-}
 .vmo-monaco-editor-container .codicon.codicon-light-bulb.lightbulb-glyph {
   @apply hidden pointer-events-none;
+}
+.vmo-monaco-editor-container .codicon{
+  @apply cursor-pointer
 }
 </style>
 

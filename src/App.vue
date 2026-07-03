@@ -169,7 +169,8 @@ const remindConfig = ref([
             lineNumbers: true,
             minimap: true,
             fontSize: true,
-            fullScreen: true
+            fullScreen: true,
+            reviewActions: true
           }"></vmo-monaco-ui>
       </vmo-monaco-diff-editor>
       <vmo-monaco-editor

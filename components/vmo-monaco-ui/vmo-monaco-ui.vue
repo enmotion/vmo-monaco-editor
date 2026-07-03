@@ -6,13 +6,20 @@
   <div :class="['vmo-monaco-ui', theme == 'vs-dark' ? 'dark' : 'light']">
     <span class="title">{{ title }}</span>
     <span class="setting">
+     
       <!-- 默认控件不再由 UI 容器承接事件；它们通过 inject 到的 monaco 自行调用 editor public API。 -->
       <language-select v-if="!!config.languages && config.languages.length>1" :config="languageControlConfig" />
       <font-size-input v-if="!!config?.fontSize" :config="fontSizeControlConfig" />
+      <review-actions v-if="!!config?.reviewActions" :config="reviewActionsControlConfig">
+        <template v-if="$slots['review-actions']" #default="slotProps">
+          <slot name="review-actions" v-bind="slotProps"></slot>
+        </template>
+      </review-actions>
       <theme-toggle v-if="!!config?.theme" :config="themeControlConfig" />
       <fullscreen-toggle v-if="!!config?.fullScreen" />
       <minimap-toggle v-if="!!config?.minimap" />
       <line-numbers-toggle v-if="!!config?.lineNumbers" :config="lineNumbersControlConfig" />
+      
       <commit-button v-if="monacoNeedConfirm || !!config?.commit" />
     </span>
   </div>
@@ -65,6 +72,7 @@ import FullscreenToggle from './controls/fullscreen-toggle.vue'
 import MinimapToggle from './controls/minimap-toggle.vue'
 import LineNumbersToggle from './controls/line-numbers-toggle.vue'
 import CommitButton from './controls/commit-button.vue'
+import ReviewActions from './controls/review-actions.vue'
 import type { VmoMonacoLanguageControlConfig } from './controls/language-select.vue'
 import type { VmoMonacoFontSizeControlConfig } from './controls/font-size-input.vue'
 import type { VmoMonacoThemeControlConfig } from './controls/theme-toggle.vue'
@@ -72,6 +80,7 @@ import type { VmoMonacoMinimapControlConfig } from './controls/minimap-toggle.vu
 import type { VmoMonacoLineNumbersControlConfig } from './controls/line-numbers-toggle.vue'
 import type { VmoMonacoFullScreenControlConfig } from './controls/fullscreen-toggle.vue'
 import type { VmoMonacoCommitControlConfig } from './controls/commit-button.vue'
+import type { VmoMonacoReviewActionsControlConfig } from './controls/review-actions.vue'
 import { VMO_MONACO_EDITOR_KEY } from './controls/use-monaco-control'
 import type { VmoMonacoControlTarget } from './controls/use-monaco-control'
 
@@ -86,6 +95,7 @@ export type MonacoUIConfig = {
   lineNumbers: boolean | VmoMonacoLineNumbersControlConfig
   fullScreen: boolean | VmoMonacoFullScreenControlConfig
   commit: boolean | VmoMonacoCommitControlConfig
+  reviewActions: boolean | VmoMonacoReviewActionsControlConfig
   language: boolean | VmoMonacoLanguageControlConfig
   languages: string[]
 }
@@ -100,7 +110,8 @@ export default defineComponent({
     FullscreenToggle,
     MinimapToggle,
     LineNumbersToggle,
-    CommitButton
+    CommitButton,
+    ReviewActions
   },
   props: {
     title: {
@@ -160,6 +171,9 @@ export default defineComponent({
     const lineNumbersControlConfig = computed(() => {
       return typeof props.config?.lineNumbers == 'string' ? props.config.lineNumbers : undefined
     })
+    const reviewActionsControlConfig = computed(() => {
+      return !!props.config?.reviewActions
+    })
 
     return {
       theme,
@@ -168,7 +182,8 @@ export default defineComponent({
       languageControlConfig,
       fontSizeControlConfig,
       themeControlConfig,
-      lineNumbersControlConfig
+      lineNumbersControlConfig,
+      reviewActionsControlConfig
     }
   }
 })
