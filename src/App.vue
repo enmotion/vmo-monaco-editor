@@ -118,7 +118,7 @@ const remindConfig = ref([
       <textarea v-model="originalContent" class="border h-[180px] mt-[10px] text-xs" />
       <textarea v-model="modifiedContent" class="border h-[180px] mt-[10px] text-xs" />
     </div>
-    <div class="flex-col flex grow w-0">
+    <div class="flex-col flex grow w-0 text-xs">
       {{ originalContent }}
       {{ codeContent2 }}
       <!-- <vmo-monaco-editor

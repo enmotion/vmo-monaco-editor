@@ -65,11 +65,11 @@
           </button>
         </div>
         <span class="flex flex-row items-center gap-[5px]">
-          <button class="reviewPanelButton grow is-accept" type="button" title="Accept all" aria-label="Accept all" @click="acceptAllChanges">
-            <span class="reviewPanelIcon !text-xs font-normal iconfont vmo-plus"></span>
-          </button>
           <button class="reviewPanelButton grow is-reject" type="button" title="Reject all" aria-label="Reject all" @click="rejectAllChanges">
             <span class="reviewPanelIcon !text-xs font-normal iconfont vmo-sub"></span>
+          </button>
+          <button class="reviewPanelButton grow is-accept" type="button" title="Accept all" aria-label="Accept all" @click="acceptAllChanges">
+            <span class="reviewPanelIcon !text-xs font-normal iconfont vmo-plus"></span>
           </button>
         </span>
       </slot>
@@ -90,7 +90,7 @@
   @apply block leading-none font-bold;
 }
 .reviewPanel {
-  @apply absolute right-0 top-[26px] z-20 flex flex-col gap-[8px] p-[8px] rounded border border-[#88888833] bg-white text-gray-800 shadow-lg;
+  @apply absolute right-[12px] top-[12px] z-20 flex flex-col gap-[8px] p-[8px] rounded border border-[#88888833] bg-white text-gray-800 shadow-lg;
 }
 .dark .reviewPanel {
   @apply absolute bg-[#1C1C1C] text-[#FFFFFFCC];
