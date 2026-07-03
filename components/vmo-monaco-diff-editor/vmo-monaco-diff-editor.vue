@@ -484,6 +484,10 @@ export default defineComponent({
       emitChange()
     }
 
+    function emitModelValuesWithoutConfirm() {
+      !props.needConfirm && emitModelValues()
+    }
+
     // 从 Monaco diff editor 读取最新差异块。
     function refreshLineChanges() {
       const editor = getDiffEditor()
@@ -579,7 +583,7 @@ export default defineComponent({
       const nextValue = modifiedModel.value?.getValue() || ''
       setModelValue(originalModel.value, nextValue)
       nextTick(() => {
-        emitModelValues()
+        emitModelValuesWithoutConfirm()
         refreshLineChanges()
         context.emit('accept-all', {
           originalValue: originalInnerValue.value,
@@ -593,7 +597,7 @@ export default defineComponent({
       const nextValue = originalModel.value?.getValue() || ''
       setModelValue(modifiedModel.value, nextValue)
       nextTick(() => {
-        emitModelValues()
+        emitModelValuesWithoutConfirm()
         refreshLineChanges()
         context.emit('reject-all', {
           originalValue: originalInnerValue.value,
@@ -622,7 +626,7 @@ export default defineComponent({
       )
       if (!lineChange) return
       nextTick(() => {
-        emitModelValues()
+        emitModelValuesWithoutConfirm()
         refreshLineChanges()
         context.emit(action == 'accept' ? 'accept-change' : 'reject-change', {
           index,

@@ -120,6 +120,7 @@ const remindConfig = ref([
     </div>
     <div class="flex-col flex grow w-0">
       {{ codeContent }}
+      {{ codeContent2 }}
       <vmo-monaco-editor
         ref="vmoMonacoEditorInstance"
         :model-value="codeContent"
@@ -132,7 +133,7 @@ const remindConfig = ref([
         }"
         :disabled="disabled"
         :bidibind="true"
-        :need-confirm="false"
+        :need-confirm="true"
         :remind-config="remindConfig"
         class="flex-grow"
         @update:modelValue="codeContent = $event"

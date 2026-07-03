@@ -16,10 +16,11 @@ export default defineComponent({
   },
   emits: ['commit'],
   setup(props, context) {
-    const { monacos, eachMonaco } = useVmoMonacoControl(props)
+    const { monacos } = useVmoMonacoControl(props)
 
     function handleCommit() {
-      eachMonaco(monaco => {
+      const commitTargets = [...monacos.value].reverse()
+      commitTargets.forEach(monaco => {
         monaco.commit()
       })
       context.emit('commit', {
