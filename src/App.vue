@@ -10,7 +10,8 @@ import commitButton from '@comps/vmo-monaco-ui/controls/commit-button.vue'
 // initMonacoEnvironment()
 const codeContent = ref('SELECT * FROM table_name')
 const codeContent2 = ref('SELECT * FROM table_name')
-const diffDisplayMode = ref<'original' | 'modified' | 'diff'>('diff')
+const appTheme = ref<'vs-light' | 'vs-dark'>('vs-light')
+const diffDisplayMode = ref<'original' | 'modified' | 'diff'>('original')
 const diffViewMode = ref<'side-by-side' | 'inline'>('side-by-side')
 const originalContent = ref(`项目上线前，产品团队需要完成一次完整的文字校对工作。
 
@@ -21,15 +22,7 @@ const originalContent = ref(`项目上线前，产品团队需要完成一次完
 另外，帮助说明中对异常场景的描述较少。当网络失败、权限不足、或数据为空时，页面只给出简短提示，无法帮助用户判断下一步应该怎么处理。
 
 因此，我们需要在保留原有语义的基础上，对段落结构、表达顺序、以及关键提示进行调整。`)
-const modifiedContent = ref(`项目上线前，产品团队需要完成一次完整的文字审阅和校对工作。
-
-本次校对的目标，是确认页面中的说明文本能够准确表达功能边界，并保证用户阅读后，可以理解每一个操作入口的用途和影响范围。
-
-在旧版本文案中，部分语句过于口语化，步骤说明也缺少必要的上下文。例如，用户看到“提交”按钮时，并不知道提交后会立即生效，还是进入待审核流程。
-
-另外，帮助说明中对异常场景的描述较少。当网络失败、权限不足、或数据为空时，页面只给出简短提示，无法帮助用户判断下一步应该如何处理。
-
-因此，我们需要在保留原有语义的基础上，对段落结构、表达顺序、关键提示以及异常说明进行调整，让文字更适合正式发布场景。`)
+const modifiedContent = ref(``)
 const sqlReminderGenerator = useReminderPlugin('sql')
 const pythonReminderGenerator = useReminderPlugin('python')
 const typescriptReminderGenerator = useReminderPlugin()
@@ -38,6 +31,10 @@ const vmoMonacoEditorInstance = ref(null as any)
 const vmoMonacoEditorInstance2 = ref(null as any)
 const vmoMonacoDiffEditorInstance = ref(null as any)
 const disabled = ref(true)
+
+function toggleAppTheme() {
+  appTheme.value = appTheme.value == 'vs-light' ? 'vs-dark' : 'vs-light'
+}
 
 const remindConfig = ref([
   {
@@ -100,6 +97,11 @@ const remindConfig = ref([
         @click="disabled = !disabled">
         disabled :{{ disabled }}
       </div>
+      <div
+        class="mt-[10px] bg-gray-800 p-[10px] text-white rounded cursor-pointer hover:bg-gray-700"
+        @click="toggleAppTheme">
+        theme :{{ appTheme }}
+      </div>
       <div class="mt-[10px] text-xs text-gray-700">Diff display mode</div>
       <div class="flex flex-row gap-[6px] mt-[6px]">
         <button class="border px-[8px] py-[4px]" @click="diffDisplayMode = 'original'">原文</button>
@@ -128,7 +130,7 @@ const remindConfig = ref([
         suffix=""
         :z-index="5000"
         :monaco-options="{
-          theme: 'vs-light',
+          theme: appTheme,
           language: 'sql'
         }"
         :disabled="disabled"
@@ -155,7 +157,7 @@ const remindConfig = ref([
         v-model:original-value="originalContent"
         v-model:modified-value="modifiedContent"
         :monaco-options="{
-          theme: 'vs-light',
+          theme: appTheme,
           language: 'plaintext',
           wordWrap: 'on',
           fontSize: 14,
@@ -200,7 +202,7 @@ const remindConfig = ref([
         suffix=""
         :z-index="5000"
         :monaco-options="{
-          theme: 'vs-light',
+          theme: appTheme,
           fontSize: 14,
           language: 'sql'
         }"

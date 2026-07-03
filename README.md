@@ -1,162 +1,397 @@
 # vmo-monaco-editor
 
-`vmo-monaco-editor` 是基于 [vue3](https://vuejs.org/) 对 [monaco-editor](https://microsoft.github.io/monaco-editor/) 的再次封装；可在 vue3 项目中，以组件的方式便捷的引入 `monaco-editor`
+Vue 3 wrapper for `monaco-editor`, with a normal editor, a diff/review editor, and a reusable toolbar layer.
 
-## 安装
+## Install
 
-```nodejs
-npm i monaco-editor // current:0.33.0
-npm i vmo-monaco-editor --save // install vmo-monaco-editor
+```bash
+npm i monaco-editor ramda vue
+npm i vmo-monaco-editor
 ```
 
-## 插件环境配置
+For Vite projects, install the Monaco worker plugin:
 
-vite 配置方式
-
+```bash
+npm i vite-plugin-monaco-editor -D
 ```
-npm i vite-plugin-monaco-editor  -D // install vite-plugin-monaco-editor
-```
-
-vite.config
 
 ```ts
-import { defineConfig } from 'vite' // 5.0
-import vue from '@vitejs/plugin-vue' // 3.3.4
-import monacoEditorPlugin from 'vite-plugin-monaco-editor' //1.1.0
+// vite.config.ts
+import { defineConfig } from 'vite'
+import vue from '@vitejs/plugin-vue'
+import monacoEditorPlugin from 'vite-plugin-monaco-editor'
 
 export default defineConfig({
-  ...
   plugins: [
     vue(),
-    // 如果 vite.config 为 ts 则可能需要使用注释，vite-plugin-monaco-editor 的模块入口与类型声明不一致 导致的问题修复
-    //@ts-ignore
+    // @ts-ignore vite-plugin-monaco-editor default export typing may differ by version
     monacoEditorPlugin.default({
-      languageWorkers: ['editorWorkerService', 'css', 'html', 'json', 'typescript'],
-      ....
+      languageWorkers: ['editorWorkerService', 'css', 'html', 'json', 'typescript']
     })
-    ...
-  ],
+  ]
 })
 ```
 
-## 使用方式
+Import the bundled style once:
 
-创建 componet.vue 单文件，此单例使用了 [tailwind.css](https://tailwindcss.com/)
+```ts
+import 'vmo-monaco-editor/dist/style.css'
+```
 
-```typescript
-<script setup lang='ts'>
-  import {ref} from 'vue';
-  import { vmoMonacoEditor } from 'vmo-monaco-editor'; // 引入组件
-  import 'vmo-monaco-editor/dist/style.css'; // 引入组件外观样式
-  const codeContent = ref('SELECT * FROM table_name');
+## Exports
+
+```ts
+import {
+  VmoMonacoEditor,
+  VmoMonacoDiffEditor,
+  VmoMonacoUi,
+  VmoMonacoCommitButton,
+  VmoMonacoFontSizeInput,
+  VmoMonacoFullscreenToggle,
+  VmoMonacoLanguageSelect,
+  VmoMonacoLineNumbersToggle,
+  VmoMonacoMinimapToggle,
+  VmoMonacoDiffReview,
+  VmoMonacoThemeToggle,
+  useReminderPlugin
+} from 'vmo-monaco-editor'
+```
+
+## Normal Editor
+
+```vue
+<script setup lang="ts">
+import { ref } from 'vue'
+import { VmoMonacoEditor, VmoMonacoUi } from 'vmo-monaco-editor'
+import 'vmo-monaco-editor/dist/style.css'
+
+const code = ref('SELECT * FROM table_name')
+const editorRef = ref()
 </script>
 
 <template>
-  <div class="flex flex-row grow-1 h-full">
-    <div class="flex-col flex flex-grow w-0 bg-white border p-[10px]">
-      <textarea v-model="codeContent" class="border h-[200px]" :rows="4" />
-    </div>
-    <vmo-monaco-editor
-      :model-value="codeContent"
-      prefix="function(name){"
-      :option-config="{
-        theme: 'vs-dark',
-        language: 'sql'
-      }"
-      class="w-[800px]"
-      @update:modeValue="codeContent = $event"
-      @change="codeContent = $event">
-    </vmo-monaco-editor>
-  </div>
+  <vmo-monaco-editor
+    ref="editorRef"
+    v-model="code"
+    prefix="-- prefix text"
+    suffix="-- suffix text"
+    :need-confirm="true"
+    :monaco-options="{
+      theme: 'vs-light',
+      language: 'sql',
+      fontSize: 14
+    }"
+    class="h-[400px]">
+    <vmo-monaco-ui
+      title="SQL"
+      :monaco="editorRef"
+      :config="{
+        theme: true,
+        lineNumbers: true,
+        minimap: true,
+        fontSize: true,
+        fullScreen: true,
+        commit: true
+      }" />
+  </vmo-monaco-editor>
 </template>
-
 ```
 
-## 组件属性与事件
+When `needConfirm` is `true`, editing does not emit `update:modelValue` immediately. Call `commit()` or use `VmoMonacoCommitButton` / `VmoMonacoUi` commit control to submit the internal value.
 
-实例属性
+### `VmoMonacoEditor` Props
+
+| Prop | Type | Default | Description |
+| --- | --- | --- | --- |
+| `modelValue` | `string` | `'//code content gose here...'` | Editor content. Supports `v-model`. |
+| `prefix` | `string` | `'(()=>{})'` | Extra content displayed above the Monaco editor. It is not part of the model. |
+| `suffix` | `string` | `'};'` | Extra content displayed below the Monaco editor. It is not part of the model. |
+| `needConfirm` | `boolean` | `false` | Delay `update:modelValue` and `change` until `commit()`. |
+| `bidibind` | `boolean` | `true` | Sync external `modelValue` changes into the Monaco editor. |
+| `zIndex` | `number` | `99` | Container z-index in fullscreen mode. |
+| `disabled` | `boolean` | `false` | Sets Monaco `readOnly`. |
+| `monacoOptions` | `Partial<IStandaloneEditorConstructionOptions & { theme: 'vs-dark' \| 'vs-light' }>` | `{}` | Monaco editor options. |
+| `remindConfig` | `{ language?: 'sql' \| 'python' \| 'groovy'; extra: Partial<VmoMonacoContext> }[]` | `[]` | Completion reminder configuration. |
+
+### `VmoMonacoEditor` Events
+
+| Event | Payload | Description |
+| --- | --- | --- |
+| `update:modelValue` | `string` | Emitted on content change when `needConfirm=false`, or by `commit()`. |
+| `change` | `string` | Emitted on blur when `needConfirm=false`, or by `commit()`. |
+| `focuse` | `void` | Editor focus event. |
+| `blur` | `void` | Editor blur event. |
+
+### `VmoMonacoEditor` Exposed Methods
 
 ```ts
-props: {
-  prefix: {
-    // 前置内容
-    type: String as PropType<string>,
-    default: '(()=>{})'
-  },
-  modelValue: {
-    // 代码内容
-    type: String as PropType<string>,
-    default: 'const aa:number = 12;'
-  },
-  suffix: {
-    // 后置内容
-    type: String as PropType<string>,
-    default: '};'
-  },
-  needConfirm: {
-    // 是否需要触发确认才能提交代码
-    type: Boolean as PropType<boolean>,
-    default: false
-  },
-  bidibind: {
-    // 是否双向绑定，当 props.modelValue 在外部发生变化时，也会同步触发代码编辑内容变化
-    type: Boolean as PropType<boolean>,
-    default: true
-  },
-  zIndex: {
-    // 全屏模式时，其z-index 的值
-    type: Number as PropType<number>,
-    default: 99
-  },
-  remindConfig: {
-    // 提示词配置
-    type: Array as PropType<{ language?: 'sql' | 'python' | 'groovy'; extra: Partial<VmoMonacoContext> }[]>,
-    default: () => []
-  },
-  disabled: {
-    // 是否禁用
-    type: Boolean as PropType<boolean>,
-    default: false
-  },
-  monacoOptions: {
-    // monaco-editor 配置
-    type: Object as PropType<
-      Partial<Monaco.editor.IStandaloneEditorConstructionOptions & { theme: 'vs-dark' | 'vs-light' }>
-    >,
-    default: () => ({})
-  }
-},
+editorRef.value.insertCodeString(code)
+editorRef.value.fullscreenSwitch()
+editorRef.value.resetMonacoEditorOptions(options)
+editorRef.value.refreshMonacoEditor()
+editorRef.value.changeLanguage(language)
+editorRef.value.commit()
 ```
 
-实例事件
+## Diff Editor
+
+`VmoMonacoDiffEditor` manages two stable Monaco models:
+
+- `originalValue`: confirmed/current text
+- `modifiedValue`: proposal text
+
+Review actions move content between these two models:
+
+- accept: copy modified change into original
+- reject: copy original change into modified
+- confirm/commit: emit current original/modified values
+
+```vue
+<script setup lang="ts">
+import { ref } from 'vue'
+import { VmoMonacoDiffEditor, VmoMonacoUi } from 'vmo-monaco-editor'
+import 'vmo-monaco-editor/dist/style.css'
+
+const original = ref('hello world')
+const modified = ref('hello monaco')
+const diffRef = ref()
+</script>
+
+<template>
+  <vmo-monaco-diff-editor
+    ref="diffRef"
+    v-model:original-value="original"
+    v-model:modified-value="modified"
+    :need-confirm="true"
+    display-mode="diff"
+    diff-view-mode="inline"
+    :editable-original="true"
+    :editable-modified="true"
+    :monaco-options="{
+      theme: 'vs-light',
+      language: 'plaintext',
+      wordWrap: 'on',
+      minimap: { enabled: false }
+    }"
+    class="h-[500px]">
+    <vmo-monaco-ui
+      title="Review"
+      :monaco="diffRef"
+      :config="{
+        theme: true,
+        lineNumbers: true,
+        fontSize: true,
+        fullScreen: true,
+        reviewActions: true,
+        commit: true
+      }" />
+  </vmo-monaco-diff-editor>
+</template>
+```
+
+### `needConfirm` in Diff Review
+
+When `needConfirm=true`, normal edits and review actions update internal models only. They do not emit `update:originalValue` / `update:modifiedValue` until `confirm()` or `commit()` is called.
+
+Review events such as `accept-all` and `reject-change` still emit so the host app can react to internal review operations.
+
+### `VmoMonacoDiffEditor` Props
+
+| Prop | Type | Default | Description |
+| --- | --- | --- | --- |
+| `originalValue` | `string` | `''` | Original/confirmed text. Supports `v-model:original-value`. |
+| `modifiedValue` | `string` | `''` | Modified/proposal text. Supports `v-model:modified-value`. |
+| `prefix` | `string` | `''` | Extra content above the editor. |
+| `suffix` | `string` | `''` | Extra content below the editor. |
+| `displayMode` | `'original' \| 'modified' \| 'diff'` | `'diff'` | Show original, modified, or diff editor. |
+| `diffViewMode` | `'side-by-side' \| 'inline'` | `'side-by-side'` | Diff rendering mode. |
+| `editableOriginal` | `boolean` | `false` | Allow editing original side/model. |
+| `editableModified` | `boolean` | `true` | Allow editing modified side/model. |
+| `needConfirm` | `boolean` | `false` | Delay value updates until `confirm()` / `commit()`. |
+| `bidibind` | `boolean` | `true` | Sync external prop changes into internal models. |
+| `zIndex` | `number` | `99` | Container z-index in fullscreen mode. |
+| `disabled` | `boolean` | `false` | Readonly state for editor views. |
+| `originalUri` | `string` | `'vmo-monaco-diff-original'` | URI identity for original model. |
+| `modifiedUri` | `string` | `'vmo-monaco-diff-modified'` | URI identity for modified model. |
+| `monacoOptions` | `Partial<IStandaloneEditorConstructionOptions & { theme: 'vs-dark' \| 'vs-light' }>` | `{}` | Shared Monaco editor options. |
+| `diffOptions` | `Partial<IStandaloneDiffEditorConstructionOptions>` | `{}` | Diff editor options. |
+| `showReviewActions` | `boolean` | `true` | Enables native Monaco `+/-` review click handling. |
+
+### `VmoMonacoDiffEditor` Events
+
+| Event | Payload | Description |
+| --- | --- | --- |
+| `update:originalValue` | `string` | Emitted when original value is submitted. |
+| `update:modifiedValue` | `string` | Emitted when modified value is submitted. |
+| `change` | `{ originalValue: string; modifiedValue: string }` | Current pair of values. |
+| `accept-change` | `{ index?: number; lineChange?: ILineChange; originalValue: string; modifiedValue: string }` | Single diff block accepted. |
+| `reject-change` | `{ index?: number; lineChange?: ILineChange; originalValue: string; modifiedValue: string }` | Single diff block rejected. |
+| `accept-all` | `{ originalValue: string; modifiedValue: string }` | All changes accepted. |
+| `reject-all` | `{ originalValue: string; modifiedValue: string }` | All changes rejected. |
+| `confirm` | `{ originalValue: string; modifiedValue: string; confirmedValue: string }` | Current result confirmed. `confirmedValue` is the original model value. |
+| `focuse` | `void` | Editor focus event. |
+| `blur` | `void` | Editor blur event. |
+| `mode-change` | `'original' \| 'modified' \| 'diff'` | Display mode changed. |
+
+### `VmoMonacoDiffEditor` Exposed Methods
 
 ```ts
-emits: ['update:modelValue', 'change', 'focuse', 'blur'],
-
-// 前提:props.needConfirm:false
-updata:modelValue:($event:string)=>any // v-model 的实现,返回当前编写的代码
-// 前提:props.needConfirm:false
-change:($event:string)=>any // 时失焦后触发代码内容提交,返回当前编写的代码，
-
-focues // 获得焦点事件
-blur // 失去焦点事件
+diffRef.value.resetMonacoEditorOptions(options)
+diffRef.value.resetMonacoDiffEditorOptions(options)
+diffRef.value.fullscreenSwitch()
+diffRef.value.changeLanguage(language)
+diffRef.value.changeDisplayMode('diff')
+diffRef.value.changeDiffViewMode('inline')
+diffRef.value.acceptChange(index)
+diffRef.value.rejectChange(index)
+diffRef.value.acceptAllChanges()
+diffRef.value.rejectAllChanges()
+diffRef.value.confirm()
+diffRef.value.commit()
+diffRef.value.getLineChanges()
+diffRef.value.getOriginalEditor()
+diffRef.value.getModifiedEditor()
+diffRef.value.getDiffEditor()
 ```
 
-实例插槽
+## Toolbar UI
 
-```
-<template #default></template>
-<template #prefix></template>
-<template #suffix></template>
+`VmoMonacoUi` is a toolbar container. It receives one editor instance or an array of editor instances through `monaco`, then provides that context to inner controls.
+
+```vue
+<vmo-monaco-ui
+  title="Editor"
+  :monaco="editorRef"
+  :config="{
+    theme: true,
+    lineNumbers: true,
+    minimap: true,
+    fontSize: { min: 10, max: 32, step: 1 },
+    fullScreen: true,
+    commit: true,
+    language: { languages: ['sql', 'javascript', 'typescript'] },
+    languages: ['sql', 'javascript', 'typescript']
+  }" />
 ```
 
-实例方法
+For a diff editor, enable the review popover:
+
+```vue
+<vmo-monaco-ui
+  :monaco="diffRef"
+  :config="{
+    reviewActions: true,
+    commit: true,
+    theme: true,
+    fontSize: true
+  }" />
+```
+
+If `monaco` is an array, control actions apply to all targets. For `commit`, targets are committed in reverse order so the first item is treated as the primary editor and commits last.
+
+### UI Config
+
+| Key | Type | Description |
+| --- | --- | --- |
+| `fontSize` | `boolean \| { min?: number; max?: number; step?: number }` | Show font size input. |
+| `theme` | `boolean \| 'vs-dark' \| 'vs-light'` | Show theme toggle. |
+| `minimap` | `boolean` | Show minimap toggle. |
+| `lineNumbers` | `boolean \| 'on' \| 'off'` | Show line number toggle. |
+| `fullScreen` | `boolean` | Show fullscreen toggle. |
+| `commit` | `boolean` | Show commit button. |
+| `reviewActions` | `boolean` | Show diff review popover. Requires a diff editor target. |
+| `language` | `boolean \| { languages?: string[] }` | Language select control config. |
+| `languages` | `string[]` | Shortcut language list for language select. |
+
+### Custom Toolbar Slot
+
+You can replace the default toolbar layout and still use controls through injection:
+
+```vue
+<vmo-monaco-ui :monaco="diffRef">
+  <div class="flex flex-row items-center justify-between grow">
+    <span>Review</span>
+    <span class="flex flex-row items-center">
+      <vmo-monaco-commit-button />
+      <vmo-monaco-diff-review />
+      <vmo-monaco-font-size-input />
+      <vmo-monaco-theme-toggle />
+    </span>
+  </div>
+</vmo-monaco-ui>
+```
+
+Controls can also be used outside `VmoMonacoUi` by passing `:monaco="editorRef"` directly.
+
+## Diff Review Control
+
+`VmoMonacoDiffReview` renders a compare icon. Clicking it opens a popover with icon-only actions:
+
+- original / proposal / diff display mode
+- side-by-side / inline diff view mode
+- reject all / accept all
+- current diff block count
+
+It also exposes a `review-actions` slot through `VmoMonacoUi`:
+
+```vue
+<vmo-monaco-ui :monaco="diffRef" :config="{ reviewActions: true }">
+  <template #review-actions="{ lineChanges, acceptAllChanges, rejectAllChanges, changeDisplayMode }">
+    <button @click="changeDisplayMode('diff')">Diff</button>
+    <button @click="rejectAllChanges()">Reject {{ lineChanges.length }}</button>
+    <button @click="acceptAllChanges()">Accept</button>
+  </template>
+</vmo-monaco-ui>
+```
+
+## Reminder Plugins
+
+`useReminderPlugin(language)` returns a completion provider factory for built-in reminder languages:
 
 ```ts
-instance.insertCodeString(code:string) // 在当前光标位置插入代码 code
-instance.fullscreenSwitch() // 全屏模式切换
-instance.resetMonacoEditorOptions(options: Partial<Monaco.editor.IStandaloneEditorConstructionOptions>) // 将重制 MonacoEditor的配置 运行时更改
-instance.refreshMonacoEditor() // 刷新
-instance.changeLanguage(language:string) // 切换语言
-instance.commit() // 外部主动触发提交内部编写的代码
+const sqlReminder = useReminderPlugin('sql')
+const pythonReminder = useReminderPlugin('python')
+const groovyReminder = useReminderPlugin('groovy')
+const defaultReminder = useReminderPlugin()
 ```
+
+Usually you do not call this directly. Pass `remindConfig` to `VmoMonacoEditor`:
+
+```vue
+<vmo-monaco-editor
+  v-model="code"
+  :remind-config="[
+    {
+      language: 'sql',
+      extra: {
+        properties: ['table_a', 'table_b'],
+        methods: ['COUNT', 'SUM']
+      }
+    }
+  ]" />
+```
+
+## Type Exports
+
+The package exports public types such as:
+
+```ts
+import type {
+  VmoMonacoEditorExpose,
+  VmoMonacoDiffEditorExpose,
+  VmoMonacoEditorOption,
+  VmoMonacoDiffChangePayload,
+  VmoMonacoDiffConfirmPayload,
+  VmoMonacoDiffReviewActionPayload,
+  VmoMonacoDiffDisplayMode,
+  VmoMonacoDiffViewMode,
+  VmoMonacoControlTarget
+} from 'vmo-monaco-editor'
+```
+
+## Notes
+
+- The editor components use `Teleport` in fullscreen mode to avoid parent layout clipping.
+- `prefix` and `suffix` are displayed outside Monaco and are not part of the editor model.
+- Monaco theme is global. Switching theme in one editor affects Monaco theme rendering globally.
+- The native diff `+/-` actions are handled by `VmoMonacoDiffEditor` when `showReviewActions=true`.
