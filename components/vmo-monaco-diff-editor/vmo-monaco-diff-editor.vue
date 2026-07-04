@@ -60,7 +60,7 @@
 </style>
 
 <script lang="ts">
-import { defineComponent, ref, shallowRef, onMounted, onBeforeUnmount, watch, computed, nextTick } from 'vue'
+import { defineComponent, ref, shallowRef, onMounted, onBeforeUnmount, watch, computed, nextTick, getCurrentInstance } from 'vue'
 import { mergeDeepRight, equals, clone, isNil } from 'ramda'
 import 'monaco-editor/esm/vs/basic-languages/css/css.contribution'
 import 'monaco-editor/esm/vs/basic-languages/xml/xml.contribution'
@@ -87,6 +87,9 @@ import type {
   VmoMonacoReviewActionMaps,
   VmoMonacoReviewSide
 } from './types'
+
+const DEFAULT_ORIGINAL_URI = 'vmo-monaco-diff-original'
+const DEFAULT_MODIFIED_URI = 'vmo-monaco-diff-modified'
 
 export type {
   VmoMonacoDiffChangePayload,
@@ -150,11 +153,11 @@ export default defineComponent({
     },
     originalUri: {
       type: String as PropType<string>,
-      default: 'vmo-monaco-diff-original'
+      default: DEFAULT_ORIGINAL_URI
     },
     modifiedUri: {
       type: String as PropType<string>,
-      default: 'vmo-monaco-diff-modified'
+      default: DEFAULT_MODIFIED_URI
     },
     monacoOptions: {
       type: Object as PropType<
@@ -185,6 +188,7 @@ export default defineComponent({
     'mode-change'
   ],
   setup(props, context) {
+    const componentUid = getCurrentInstance()?.uid || Math.random().toString(36).slice(2)
     // ===== 容器状态 =====
     // 这些状态控制组件外壳，与 Monaco model 内容无关。
     const isFullScreen = ref(false as any)
@@ -345,12 +349,12 @@ export default defineComponent({
       originalModel.value = Monaco.editor.createModel(
         props.originalValue,
         computedMonacoEditorOption.value.language,
-        Monaco.Uri.parse(`inmemory://${props.originalUri}`)
+        createModelUri(props.originalUri, DEFAULT_ORIGINAL_URI)
       )
       modifiedModel.value = Monaco.editor.createModel(
         props.modifiedValue,
         computedMonacoEditorOption.value.language,
-        Monaco.Uri.parse(`inmemory://${props.modifiedUri}`)
+        createModelUri(props.modifiedUri, DEFAULT_MODIFIED_URI)
       )
       modelDisposables.value = [
         originalModel.value.onDidChangeContent(() => {
@@ -385,6 +389,7 @@ export default defineComponent({
         updateCurrentEditorOptions()
         refreshLineChanges()
         refreshReviewActionMaps()
+        layoutCurrentEditor()
         return
       }
 
@@ -400,6 +405,26 @@ export default defineComponent({
       bindNormalEditorEvents(instance)
       updateCurrentEditorOptions()
       lineChanges.value = []
+      layoutCurrentEditor()
+    }
+
+    function createModelUri(uri: string, defaultUri: string) {
+      const baseUri = uri == defaultUri ? `${uri}-${componentUid}` : uri
+      let modelUri = Monaco.Uri.parse(`inmemory://${baseUri}`)
+      let retryIndex = 1
+      while (Monaco.editor.getModel(modelUri)) {
+        modelUri = Monaco.Uri.parse(`inmemory://${baseUri}-${componentUid}-${retryIndex}`)
+        retryIndex++
+      }
+      return modelUri
+    }
+
+    function layoutCurrentEditor() {
+      nextTick(() => {
+        requestAnimationFrame(() => {
+          monacoEditorInstance.value?.layout()
+        })
+      })
     }
 
     // 普通 editor 与 diff 的 modified editor 共用焦点/失焦事件绑定。

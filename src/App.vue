@@ -173,7 +173,7 @@ const remindConfig = ref([
         class="flex-grow border-t border-t-[#88888844]">
         <vmo-monaco-ui
           title="Text-Diff"
-          :monaco="[vmoMonacoDiffEditorInstance,vmoMonacoEditorInstance]"
+          :monaco="[vmoMonacoDiffEditorInstance,vmoMonacoEditorInstance2]"
           :config="{
             theme: true,
             lineNumbers: true,
@@ -195,7 +195,7 @@ const remindConfig = ref([
           </div>  
         </vmo-monaco-ui>
       </vmo-monaco-diff-editor>
-      <vmo-monaco-editor
+      <vmo-monaco-diff-editor
         ref="vmoMonacoEditorInstance2"
         :model-value="codeContent2"
         prefix=""
@@ -217,7 +217,7 @@ const remindConfig = ref([
         @update:modelValue="codeContent2 = $event"
         @change="codeContent2 = $event">
         <vmo-monaco-ui
-          :monaco="vmoMonacoEditorInstance2"
+          :monaco="[vmoMonacoEditorInstance2,vmoMonacoDiffEditorInstance]"
           :config="{
             theme: true,
             lineNumbers: true,
@@ -226,7 +226,7 @@ const remindConfig = ref([
             fullScreen: true
             // languages: ['css', 'typescript', 'sql']
           }"></vmo-monaco-ui>
-      </vmo-monaco-editor>
+      </vmo-monaco-diff-editor>
     </div>
   </div>
 </template>
