@@ -4,10 +4,10 @@
     控件通过 inject 消费 editor public API，自行完成对应行为。
   -->
   <div :class="['vmo-monaco-ui', theme == 'vs-dark' ? 'dark' : 'light']">
-    <div class="flex grow flex-row setting">
-      <slot class="flex flex-row justify-between">
+    <div class="bar">
+      <slot>
         <span class="title">{{ title }}</span>
-        <span class="flex flex-row">
+        <span class="setting">
           <!-- 默认控件不再由 UI 容器承接事件；它们通过 inject 到的 monaco 自行调用 editor public API。 -->
           <language-select v-if="!!config.languages && config.languages.length>1" :config="languageControlConfig" />
           <font-size-input v-if="!!config?.fontSize" :config="fontSizeControlConfig" />
@@ -38,6 +38,9 @@
 }
 .vmo-monaco-ui.light {
   @apply bg-[#FFFFFF] text-gray-800;
+}
+.vmo-monaco-ui .bar {
+  @apply flex flex-row grow items-center justify-between;
 }
 .vmo-monaco-ui .title {
   @apply text-xs font-bold flex-grow;
