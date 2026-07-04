@@ -5,7 +5,7 @@
   -->
   <div :class="['vmo-monaco-ui', theme == 'vs-dark' ? 'dark' : 'light']">
     <div class="flex grow flex-row setting">
-      <slot class="flex flex-row">
+      <slot class="flex flex-row justify-between">
         <span class="title">{{ title }}</span>
         <span class="flex flex-row">
           <!-- 默认控件不再由 UI 容器承接事件；它们通过 inject 到的 monaco 自行调用 editor public API。 -->
