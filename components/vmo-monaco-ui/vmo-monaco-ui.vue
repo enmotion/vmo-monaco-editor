@@ -43,7 +43,7 @@
   @apply text-xs font-bold flex-grow;
 }
 .vmo-monaco-ui .setting {
-  @apply text-xs flex flex-row items-center;
+  @apply text-xs flex flex-row items-center justify-between;
 }
 .vmo-monaco-ui .iconButton {
   @apply !w-[20px] !h-[20px] shrink-0 rounded flex flex-row items-center justify-center cursor-pointer mr-[10px] last:mr-0;
