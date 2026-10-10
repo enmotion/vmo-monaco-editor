@@ -2,12 +2,12 @@
   <button
     v-if="previewMonacos.length"
     type="button"
-    :class="['vmo-preview-toggle', { 'is-active': currentValue }]"
-    title="Preview"
-    aria-label="Preview"
+    :class="['vmo-preview-toggle iconfont',currentValue?'is-active vmo-modify':'vmo-preview']"
+    :title="currentValue ? 'edit' : 'preview'"
+    :aria-label="currentValue ? 'edit' : 'preview'"
     :aria-pressed="currentValue"
     @click="togglePreview">
-    <slot :active="currentValue">P</slot>
+    <slot :active="currentValue"></slot>
   </button>
 </template>
 

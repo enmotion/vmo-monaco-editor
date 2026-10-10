@@ -1,2 +1,11 @@
 [  505030ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://127.0.0.1:1980/src/App.vue?t=1791604746101:0
 [  505030ms] [ERROR] [hmr] Failed to reload /src/App.vue. This could be due to syntax errors or importing non-existent modules. (see errors above) @ http://127.0.0.1:1980/@vite/client:175
+[  946067ms] [WARNING] [Vue warn]: Failed to resolve component: languages
+If this is a native custom element, make sure to exclude it from component resolution via compilerOptions.isCustomElement. 
+  at <App> @ http://127.0.0.1:1980/node_modules/.vite/deps/vue.js?v=1ae9feb4:1533
+[ 1017138ms] [WARNING] [Vue warn]: Failed to resolve component: fontSizeToolge
+If this is a native custom element, make sure to exclude it from component resolution via compilerOptions.isCustomElement. 
+  at <App> @ http://127.0.0.1:1980/node_modules/.vite/deps/vue.js?v=1ae9feb4:1533
+[ 1487949ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://127.0.0.1:1980/src/App.vue?t=1791605729014&vue&type=style&index=0&lang.css:0
+[ 1487952ms] [ERROR] [hmr] Failed to reload /src/App.vue?vue&type=style&index=0&lang.css. This could be due to syntax errors or importing non-existent modules. (see errors above) @ http://127.0.0.1:1980/@vite/client:175
+[ 1495971ms] [INFO] Slow network is detected. See https://www.chromestatus.com/feature/5636954674692096 for more details. Fallback font will be used while loading: http://127.0.0.1:1980/assets/iconfont/iconfont.woff2?t=1791605694641 @ http://127.0.0.1:1980/:0

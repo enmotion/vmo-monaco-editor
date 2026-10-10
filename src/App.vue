@@ -7,6 +7,7 @@ import themeToggle from '@comps/vmo-monaco-ui/controls/theme-toggle.vue'
 import minimapToggle from '@comps/vmo-monaco-ui/controls/minimap-toggle.vue'
 import diffReview from '@comps/vmo-monaco-ui/controls/diff-review.vue'
 import commitButton from '@comps/vmo-monaco-ui/controls/commit-button.vue'
+import previewToggle from '@comps/vmo-monaco-ui/controls/preview-toggle.vue'
 // initMonacoEnvironment()
 const codeContent = ref('SELECT * FROM table_name')
 const codeContent2 = ref('SELECT * FROM table_name')
@@ -35,7 +36,7 @@ const disabled = ref(true)
 function toggleAppTheme() {
   appTheme.value = appTheme.value == 'vs-light' ? 'vs-dark' : 'vs-light'
 }
-
+const isPreview=ref(true)
 const remindConfig = ref([
   {
     language: 'sql',
@@ -123,6 +124,7 @@ const remindConfig = ref([
     <div class="flex-col flex grow w-0 text-xs">
       {{ originalContent }}
       {{ codeContent2 }}
+      {{ isPreview }}
       <!-- <vmo-monaco-editor
         ref="vmoMonacoEditorInstance"
         :model-value="codeContent"
@@ -166,11 +168,12 @@ const remindConfig = ref([
             enabled: false
           }
         }"
-        :need-confirm="false"
+        :need-confirm="true"
         :display-mode="diffDisplayMode"
         :diff-view-mode="diffViewMode"
         :editable-original="true"
         :editable-modified="true"
+        @mode-change="isPreview = $event === 'preview'"
         class="flex-grow border-t border-t-[#88888844]">
         <vmo-monaco-ui
           title="Text-Diff"
@@ -185,6 +188,16 @@ const remindConfig = ref([
             fullScreen: true,
             reviewActions: true
           }">
+          <div class="flex-row flex grow justify-between items-center">
+            <span>aaa</span>
+            <span class="flex-row flex">
+              <previewToggle></previewToggle>
+              <commitButton v-if="!isPreview"></commitButton>
+              <fontSizeInput v-if="!isPreview"></fontSizeInput>
+              <themeToggle v-if="!isPreview"></themeToggle>
+              <diffReview v-if="!isPreview"></diffReview>
+            </span>
+          </div>
         </vmo-monaco-ui>
         <template #preview="{ content, theme }">
           <vmo-text-preview :content="content" :theme="theme" />
