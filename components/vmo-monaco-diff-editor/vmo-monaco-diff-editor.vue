@@ -212,6 +212,8 @@ export default defineComponent({
     const lineChanges = ref([] as Monaco.editor.ILineChange[])
     const reviewActionMaps = ref(createEmptyReviewActionMaps())
     let diffVersions: [number, number] | null = null
+    const diffPending = ref(true)
+    const backgroundDiffEditor = shallowRef<Monaco.editor.IStandaloneDiffEditor | null>(null)
 
     // ===== 内容缓存 =====
     // needConfirm=false 时 model 变化会立刻同步；needConfirm=true 时由 confirm/commit 输出。
@@ -351,12 +353,12 @@ export default defineComponent({
       )
       modelDisposables.value = [
         originalModel.value.onDidChangeContent(() => {
-          diffVersions = null
+          invalidateDiff()
           originalInnerValue.value = originalModel.value?.getValue() || ''
           !props.needConfirm && context.emit('update:originalValue', originalInnerValue.value)
         }),
         modifiedModel.value.onDidChangeContent(() => {
-          diffVersions = null
+          invalidateDiff()
           modifiedInnerValue.value = modifiedModel.value?.getValue() || ''
           !props.needConfirm && context.emit('update:modifiedValue', modifiedInnerValue.value)
         })
@@ -399,7 +401,18 @@ export default defineComponent({
       monacoEditorInstance.value = instance
       bindNormalEditorEvents(instance)
       updateCurrentEditorOptions()
-      lineChanges.value = []
+      // Use Monaco's own diff engine while the visible editor shows just one model.
+      // The detached view never enters the page or receives user input.
+      const comparison = Monaco.editor.createDiffEditor(document.createElement('div'), {
+        ...mergeDeepRight(computedMonacoEditorOption.value, computedDiffEditorOption.value),
+        automaticLayout: false,
+        dimension: { width: 1, height: 1 },
+        readOnly: true,
+        originalEditable: false
+      })
+      backgroundDiffEditor.value = comparison
+      bindDiffCalculation(comparison)
+      comparison.setModel({ original: originalModel.value, modified: modifiedModel.value })
       layoutCurrentEditor()
     }
 
@@ -437,12 +450,8 @@ export default defineComponent({
 
     // diff editor 额外监听 diff 结果更新，并绑定原生 +/- 点击事件。
     function bindDiffEditorEvents(editor: VmoMonacoDiffEditor) {
+      bindDiffCalculation(editor)
       editorDisposables.value.push(
-        editor.onDidUpdateDiff(() => {
-          diffVersions = [originalModel.value!.getVersionId(), modifiedModel.value!.getVersionId()]
-          refreshLineChanges()
-          refreshReviewActionMaps()
-        }),
         editor.getOriginalEditor().onMouseDown(event => {
           handleReviewActionMouseDown(event, 'original')
         }),
@@ -452,9 +461,30 @@ export default defineComponent({
       )
     }
 
+    function invalidateDiff() {
+      diffVersions = null
+      diffPending.value = true
+      lineChanges.value = []
+      clearReviewActionMaps()
+    }
+
+    function bindDiffCalculation(editor: Monaco.editor.IStandaloneDiffEditor) {
+      editorDisposables.value.push(editor.onDidUpdateDiff(() => {
+        if (!originalModel.value || !modifiedModel.value || editor.getLineChanges() === null) return
+        diffVersions = [originalModel.value.getVersionId(), modifiedModel.value.getVersionId()]
+        diffPending.value = false
+        refreshLineChanges()
+        refreshReviewActionMaps()
+      }))
+    }
+
     // 热更新当前 editor view 的选项，避免只因为配置变化就销毁重建 editor。
     function updateCurrentEditorOptions() {
       const instance = monacoEditorInstance.value
+      backgroundDiffEditor.value?.updateOptions({
+        ...mergeDeepRight(computedMonacoEditorOption.value, computedDiffEditorOption.value),
+        automaticLayout: false, readOnly: true, originalEditable: false
+      })
       if (!instance) return
       if (isDiffEditor(instance)) {
         instance.updateOptions(mergeDeepRight(computedMonacoEditorOption.value, computedDiffEditorOption.value))
@@ -511,7 +541,7 @@ export default defineComponent({
 
     // 从 Monaco diff editor 读取最新差异块。
     function refreshLineChanges() {
-      const editor = getDiffEditor()
+      const editor = getDiffEditor() || backgroundDiffEditor.value
       lineChanges.value = hasCurrentDiff() ? editor?.getLineChanges() || [] : []
     }
 
@@ -545,11 +575,12 @@ export default defineComponent({
     }
 
     function disposeEditor() {
-      diffVersions = null
-      clearReviewActionMaps()
+      invalidateDiff()
       editorDisposables.value.map(item => item.dispose())
       editorDisposables.value = []
       monacoEditorInstance.value?.dispose()
+      backgroundDiffEditor.value?.dispose()
+      backgroundDiffEditor.value = null
       monacoEditorInstance.value = null
     }
 
@@ -720,6 +751,7 @@ export default defineComponent({
       currentDisplayMode,
       currentDiffViewMode,
       lineChanges,
+      diffPending,
       showReviewActions: props.showReviewActions,
       resetMonacoEditorOptions,
       resetMonacoDiffEditorOptions,

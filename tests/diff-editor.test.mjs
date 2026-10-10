@@ -15,12 +15,12 @@ test('single-block review waits for current diff and ignores obsolete coordinate
   const diff = {
     setModel() {}, getOriginalEditor: () => editor, getModifiedEditor: () => editor,
     onDidUpdateDiff(fn) { didUpdateDiff = fn; return disposable() },
-    getLineChanges: () => [change], updateOptions() {}, layout() {}, dispose() {}
+    getLineChanges: () => models[0].getValue() === models[1].getValue() ? [] : [change], updateOptions() {}, layout() {}, dispose() {}
   }
   const Monaco = {
     Uri: { parse: value => value },
     editor: {
-      setTheme() {}, getModel: () => null, createDiffEditor: () => diff,
+      setTheme() {}, getModel: () => null, createDiffEditor: () => diff, create: () => ({ ...editor, dispose() {}, layout() {} }),
       createModel(value) {
         let version = 1, listener
         const model = {
@@ -34,7 +34,7 @@ test('single-block review waits for current diff and ignores obsolete coordinate
     }
   }
   const source = fs.readFileSync(new URL('../components/vmo-monaco-diff-editor/vmo-monaco-diff-editor.vue', import.meta.url), 'utf8').match(/<script lang="ts">([\s\S]*?)<\/script>/)[1]
-  const context = { exports: {}, requestAnimationFrame: fn => fn(), require(name) {
+  const context = { exports: {}, document: { createElement: () => ({}) }, requestAnimationFrame: fn => fn(), require(name) {
     if (name === 'vue') return { ...Vue, onMounted: fn => mounted.push(fn), onBeforeUnmount: fn => unmounted.push(fn), getCurrentInstance: () => ({ uid: 1 }), watch(...args) { const stop = Vue.watch(...args); stops.push(stop); return stop } }
     if (name === 'ramda') return Ramda
     if (name.startsWith('monaco-editor')) return Monaco
@@ -73,6 +73,22 @@ test('single-block review waits for current diff and ignores obsolete coordinate
   exposed.acceptChange(0)
   assert.equal(applied, 2)
   assert.equal(models[0].getValue(), 'another')
+  await Vue.nextTick()
+  exposed.changeDisplayMode('original')
+  assert.equal(exposed.diffPending.value, true)
+  didUpdateDiff()
+  assert.equal(exposed.diffPending.value, false)
+  assert.equal(exposed.getLineChanges().length, 0)
+  models[1].setValue('new proposal')
+  assert.equal(exposed.diffPending.value, true)
+  didUpdateDiff()
+  assert.equal(exposed.getLineChanges().length, 1)
+  exposed.changeDisplayMode('modified')
+  didUpdateDiff()
+  assert.equal(exposed.getLineChanges().length, 1)
+  models[0].setValue('new proposal')
+  didUpdateDiff()
+  assert.equal(exposed.getLineChanges().length, 0)
   await Vue.nextTick()
   unmounted.forEach(fn => fn())
   stops.forEach(stop => stop())

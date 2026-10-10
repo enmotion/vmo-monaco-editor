@@ -328,9 +328,10 @@ Controls can also be used outside `VmoMonacoUi` by passing `:monaco="editorRef"`
 `VmoMonacoDiffReview` renders a compare icon. Clicking it opens a popover with icon-only actions:
 
 - original / proposal / diff display mode
-- side-by-side / inline diff view mode
-- reject all / accept all
-- current diff block count
+- original / proposal modes: live diff block count (`…` while calculating)
+- diff mode: side-by-side / inline layout and reject all / accept all
+
+Bulk review buttons are disabled while differences are being calculated or when there are no differences. Switching modes keeps the popover open. Single-model views continue calculating differences using a detached Monaco diff view.
 
 It also exposes a `review-actions` slot through `VmoMonacoUi`:
 

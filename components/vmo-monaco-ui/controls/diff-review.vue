@@ -12,6 +12,8 @@
     <span v-if="isOpen" class="reviewPanel">
       <slot
         :line-changes="lineChanges"
+        :diff-pending="diffPending"
+        :current-display-mode="currentDisplayMode"
         :accept-change="acceptChange"
         :reject-change="rejectChange"
         :accept-all-changes="acceptAllChanges"
@@ -46,8 +48,17 @@
           </button>
         </span>
         <div class="flex flex-row items-center gap-[5px]">
-          <span class="reviewCount">{{ lineChanges.length }}</span>
+           <span
+            v-if="currentDisplayMode != 'diff'"
+            class="reviewCount"
+            :title="diffPending ? 'Calculating differences' : `${lineChanges.length} diff blocks`"
+            :aria-label="diffPending ? 'Calculating differences' : `${lineChanges.length} diff blocks`"
+            role="status">
+              <span>Changes:</span>
+              <span>{{ diffPending ? '…' : lineChanges.length }}</span>
+          </span>
           <button
+            v-if="currentDisplayMode == 'diff'"
             :class="['reviewPanelButton grow iconfont vmo-split', currentDiffViewMode == 'side-by-side' ? 'is-active' : '']"
             type="button"
             title="Side by side"
@@ -56,6 +67,7 @@
             <span class="reviewPanelIcon"></span>
           </button>
           <button
+            v-if="currentDisplayMode == 'diff'"
             :class="['reviewPanelButton iconfont vmo-mix', currentDiffViewMode == 'inline' ? 'is-active' : '']"
             type="button"
             title="Inline"
@@ -64,11 +76,11 @@
             <span class="reviewPanelIcon"></span>
           </button>
         </div>
-        <span class="flex flex-row items-center gap-[5px]">
-          <button class="reviewPanelButton grow is-reject" type="button" title="Reject all" aria-label="Reject all" @click="rejectAllChanges">
+        <span v-if="currentDisplayMode == 'diff'" class="flex flex-row items-center gap-[5px]">
+          <button class="reviewPanelButton grow is-reject" type="button" title="Reject all" aria-label="Reject all" :disabled="!canReview" @click="rejectAllChanges">
             <span class="reviewPanelIcon !text-xs font-normal iconfont vmo-sub"></span>
           </button>
-          <button class="reviewPanelButton grow is-accept" type="button" title="Accept all" aria-label="Accept all" @click="acceptAllChanges">
+          <button class="reviewPanelButton grow is-accept" type="button" title="Accept all" aria-label="Accept all" :disabled="!canReview" @click="acceptAllChanges">
             <span class="reviewPanelIcon !text-xs font-normal iconfont vmo-plus"></span>
           </button>
         </span>
@@ -101,6 +113,9 @@
 .reviewPanelButton {
   @apply w-[24px] h-[24px] !text-base shrink-0 rounded border border-[#88888844] bg-[#88888810] cursor-pointer flex flex-row items-center justify-center hover:bg-[#88888820];
 }
+.reviewPanelButton:disabled {
+  @apply opacity-40 cursor-default;
+}
 .reviewPanelButton.is-active {
   @apply border-[#00BB5588] text-[#00BB55] bg-[#00BB5514];
 }
@@ -111,7 +126,7 @@
   @apply text-[#DD3333];
 }
 .reviewCount {
-  @apply min-w-[26px] h-[26px] shrink-0 rounded bg-[#88888810] text-[#888888] flex flex-row items-center justify-center px-[6px];
+  @apply shrink-0 flex-grow rounded bg-[#88888810] text-[#888888] flex flex-row items-center justify-between px-[6px];
 }
 </style>
 
@@ -142,6 +157,8 @@ export default defineComponent({
     const lineChanges = computed(() => {
       return primaryDiffMonaco.value?.lineChanges || primaryDiffMonaco.value?.getLineChanges() || []
     })
+    const diffPending = computed(() => primaryDiffMonaco.value?.diffPending ?? false)
+    const canReview = computed(() => !diffPending.value && lineChanges.value.length > 0)
     const currentDisplayMode = computed(() => {
       return primaryDiffMonaco.value?.currentDisplayMode || 'diff'
     })
@@ -229,6 +246,8 @@ export default defineComponent({
       ReviewActionsRef,
       isOpen,
       lineChanges,
+      diffPending,
+      canReview,
       currentDisplayMode,
       currentDiffViewMode,
       togglePanel,
