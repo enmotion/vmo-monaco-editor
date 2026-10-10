@@ -72,3 +72,23 @@ diffRef.value?.changeDisplayMode('diff')
 ```
 
 `VmoMonacoEditorOption` 是 Monaco 普通编辑器选项的部分类型，主题限定为 `vs-dark` / `vs-light`。`VmoCodePreviewOptions` 排除由预览组件管理的 value、model、language、theme、readOnly、domReadOnly 字段。
+
+## 当前补全能力的限制
+
+`types`、`operators`、`properties` 和 `methods` 会生成提示；`objects` 虽在公共类型中定义并参与上下文合并，但当前提示生成器没有遍历它，因此不会产生对象、成员或点号后的补全。上面的 `objects` 示例仅展示类型结构。
+
+这些配置追加到内置语言词表，不替换内置提示，也不会去重。字符串方法插入 `方法名()`；结构化方法按参数名和可选类型插入，例如 `findUser(id:number)`，不是自动生成的可跳转参数占位符。提示替换范围为当前光标所在单词。
+
+省略 `language` 时使用默认工厂（无内置词表），并注册到当前 model 的语言。语言名称必须与 Monaco language ID 一致；提供提示不代表注册了语法高亮、诊断或格式化器。`remindConfig` 仅由普通编辑器支持，diff 编辑器没有此 prop。
+
+手动使用工厂时可传入第二个参数 `targetModel` 限制提示作用范围；省略后 provider 可作用于注册语言的所有 model。注册返回的 disposable 必须在不再使用时释放：
+
+```ts
+import * as Monaco from 'monaco-editor'
+import { useReminderPlugin } from 'vmo-monaco-editor'
+// model 是调用方已创建的 SQL model
+const provider = useReminderPlugin('sql')({ properties: ['users'] }, model)
+const registration = Monaco.languages.registerCompletionItemProvider('sql', provider)
+// 页面卸载或替换配置时调用
+registration.dispose()
+```

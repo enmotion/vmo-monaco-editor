@@ -4,6 +4,7 @@ const sections = (lang: 'en' | 'zh') => {
   const zh = lang === 'zh'
   return [{ text: zh ? '使用指南' : 'Guide', items: [
     ['getting-started', zh ? '快速开始' : 'Getting started'],
+    ['api', zh ? '组件 API 完整参考' : 'Complete component API'],
     ['editor', zh ? '普通编辑器' : 'Editor'],
     ['diff-editor', zh ? '差异编辑与审阅' : 'Diff editor & review'],
     ['toolbar', zh ? '工具栏与控件' : 'Toolbar & controls'],
@@ -20,12 +21,12 @@ export default defineConfig({
   lastUpdated: true,
   locales: {
     root: { link: '/', label: '简体中文', lang: 'zh-CN', title: 'VMO Monaco Editor', description: 'Vue 3 代码编辑、差异审阅与内容预览组件', themeConfig: {
-      nav: [{ text: '指南', link: '/guide/getting-started' }, { text: 'API', link: '/guide/editor' }],
+      nav: [{ text: '指南', link: '/guide/getting-started' }, { text: 'API', link: '/guide/api' }],
       sidebar: sections('zh'), outline: { label: '本页目录', level: [2, 3] },
       docFooter: { prev: '上一页', next: '下一页' }, lastUpdated: { text: '最后更新' }
     } },
     en: { label: 'English', lang: 'en-US', themeConfig: {
-      nav: [{ text: 'Guide', link: '/en/guide/getting-started' }, { text: 'API', link: '/en/guide/editor' }],
+      nav: [{ text: 'Guide', link: '/en/guide/getting-started' }, { text: 'API', link: '/en/guide/api' }],
       sidebar: sections('en'), outline: { level: [2, 3] }
     } }
   },

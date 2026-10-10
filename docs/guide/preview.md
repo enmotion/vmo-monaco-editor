@@ -1,5 +1,7 @@
 # 预览组件
 
+props、emit 与完整实例成员清单见[组件 API 完整参考](./api)。
+
 三个独立预览组件可单独使用，也可放进差异编辑器的 `#preview` 插槽：`VmoTextPreview` 展示文本，`VmoCodePreview` 使用只读 Monaco，`VmoMarkdownPreview` 渲染 Markdown。
 
 ## 独立使用

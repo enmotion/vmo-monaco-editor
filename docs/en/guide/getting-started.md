@@ -1,5 +1,7 @@
 # Getting started
 
+See the [complete component API reference](./api) for all props, emits, instance properties and methods.
+
 
 ```bash
 npm i monaco-editor@^0.33.0 ramda@^0.30.1 vue@^3.3.4

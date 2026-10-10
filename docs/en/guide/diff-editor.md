@@ -1,5 +1,7 @@
 # Diff editor & review
 
+See the [complete component API reference](./api) for all props, emits, instance properties and methods.
+
 
 `VmoMonacoDiffEditor` manages two stable Monaco models:
 
@@ -128,3 +130,19 @@ diffRef.value.getDiffEditor()
 Confirmation emits the current original model as `confirmedValue`; it does not automatically accept remaining proposals. Wait for diff calculation, accept desired changes, then confirm. Single-change methods use zero-based indices from the current `getLineChanges()` result. Avoid stale indices while `diffPending` is true.
 
 Additional state includes `currentDisplayMode`, `currentDiffViewMode`, `lineChanges`, `diffPending`, `computedMonacoEditorOption`, and `isFullScreen`. `refreshMonacoEditor()` is also available. For `togglePreview()`, `changePreviewSource()`, `hasPreview` and `currentPreviewSource`, see [Previews](./preview).
+
+## Calculation and API boundaries
+
+While `diffPending=true`, an empty `lineChanges` array does not prove equality. Single-block actions use zero-based indexes from the current calculation. Edits invalidate those indexes; stale calculations and invalid indexes make the operation return without a success review event. Recalculate and obtain fresh indexes between successive actions.
+
+Toolbar bulk buttons are disabled during calculation, but the bulk APIs themselves directly copy the entire model without checking `diffPending`. Review methods return `void`; review events are emitted on Vue's next tick. Awaiting a review method does not wait for a new diff calculation.
+
+In diff mode both side getters return editors. In a single-side mode only that side's getter returns an editor; in preview both return null. `getDiffEditor()` only returns the visible diff editor, never the background calculator. Getters can also return null before mounting or during transitions. Reacquire instances after mode changes, which recreate editors.
+
+## Permissions, URIs and lifecycle
+
+`disabled` and side editability flags constrain manual input, not review APIs. `showReviewActions=false` disables native marker click handling only; it neither hides the toolbar nor disables programmatic review. For readonly comparison, disable input, omit review controls and restrict review calls in the host application.
+
+URI props are identities used to construct `inmemory://` URIs, not file-loading URLs. Defaults include the component UID and collisions receive unique suffixes. Changing URI props after mounting does not recreate models; use a Vue `:key` to remount for a new file identity.
+
+View changes and refresh reuse both models, retaining text and model undo history, but cursor, scroll and selection are not guaranteed to persist. Unmount disposes both models and the background calculator. External text synchronization uses `setValue()`, which may reset undo history and overwrite uncommitted drafts even with `needConfirm=true`.

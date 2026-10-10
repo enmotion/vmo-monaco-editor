@@ -1,5 +1,7 @@
 # Toolbar & controls
 
+See the [complete component API reference](./api) for all props, emits, instance properties and methods.
+
 
 `VmoMonacoUi` is a toolbar container. It receives one editor instance or an array of editor instances through `monaco`, then provides that context to inner controls.
 
@@ -32,7 +34,7 @@ For a diff editor, enable the review popover:
   }" />
 ```
 
-If `monaco` is an array, control actions apply to all targets. For `commit`, targets are committed in reverse order so the first item is treated as the primary editor and commits last.
+If `monaco` is an array, option controls apply to all targets; fullscreen switches only the first target, and preview/review controls filter for compatible targets. For `commit`, targets are committed in reverse order so the first item is treated as the primary editor and commits last.
 
 ### UI Config
 
@@ -121,3 +123,11 @@ Language changes update both diff models and the preview slot's `language` value
 | Diff review | `accept-all`, `reject-all`, `confirm`, `accept-change`, `reject-change`, `display-mode-change`, `diff-view-mode-change` |
 
 An explicit `config` replaces the default config object. Editors with `needConfirm=true` automatically show the commit control.
+
+## Controlled values and event meaning
+
+Standalone controls also accept `value` and support `v-model:value`; font size and language additionally emit `update:modelValue`. An explicit value takes priority over editor-derived state, so handle updates to keep the displayed state current. Toolbar config chooses visible controls; put initial editor theme, font size and other options in `monacoOptions`.
+
+Ordinary control `commit` events report an interaction with `{ type, value?, config?, monacoCount }`. They do not report saved code or automatically call the editor's `commit()`. The commit button calls target editors’ `commit()` methods before emitting the same interaction payload. Diff review control events report interactions with type, value, config, monacoCount, index, lineChanges and an optional mode; they differ from diff editor content events.
+
+For multiple targets, displayed option values usually come from the first target while option actions apply to all targets (fullscreen uses only the first); they do not summarize mixed states. Null array entries are filtered. An explicit non-null `monaco` takes priority over toolbar injection; null falls back to the injected target.

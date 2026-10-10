@@ -1,6 +1,6 @@
 # vmo-monaco-editor
 
-[中文文档](https://enmotion.github.io/vmo-monaco-editor/) · [English documentation](https://enmotion.github.io/vmo-monaco-editor/en/)
+[中文文档](https://enmotion.github.io/vmo-monaco-editor/) · [完整组件 API](https://enmotion.github.io/vmo-monaco-editor/guide/api) · [English documentation](https://enmotion.github.io/vmo-monaco-editor/en/) · [Complete API reference](https://enmotion.github.io/vmo-monaco-editor/en/guide/api)
 
 Vue 3 wrapper for `monaco-editor`, with a normal editor, a diff/review editor, and a reusable toolbar layer.
 
@@ -291,7 +291,7 @@ For a diff editor, enable the review popover:
   }" />
 ```
 
-If `monaco` is an array, control actions apply to all targets. For `commit`, targets are committed in reverse order so the first item is treated as the primary editor and commits last.
+If `monaco` is an array, option controls apply to all targets; fullscreen switches only the first target, while preview/review controls filter for compatible targets. For `commit`, targets are committed in reverse order so the first item is treated as the primary editor and commits last.
 
 ### UI Config
 

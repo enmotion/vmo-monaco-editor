@@ -1,5 +1,7 @@
 # Preview components
 
+See the [complete component API reference](./api) for all props, emits, instance properties and methods.
+
 
 Three standalone components are exported: `VmoTextPreview`, `VmoCodePreview`, and
 `VmoMarkdownPreview`. They can be placed inside a preview slot or used on their own.
