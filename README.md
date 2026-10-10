@@ -1,5 +1,7 @@
 # vmo-monaco-editor
 
+[中文文档](https://enmotion.github.io/vmo-monaco-editor/) · [English documentation](https://enmotion.github.io/vmo-monaco-editor/en/)
+
 Vue 3 wrapper for `monaco-editor`, with a normal editor, a diff/review editor, and a reusable toolbar layer.
 
 ## Install
@@ -545,3 +547,13 @@ Toolbar language choices persist when the parent rerenders equivalent inline
 `monacoOptions`. Actual external option changes still apply, including in-place
 language updates; changing another external field preserves the selected language.
 Language changes update both diff models and the preview slot's `language` value.
+
+## Documentation development
+
+```bash
+npm run docs:dev
+npm run docs:build
+npm run docs:preview
+```
+
+Bilingual VitePress sources live in `docs/`. GitHub Pages deploys through `.github/workflows/docs.yml` on pushes to `master`.
