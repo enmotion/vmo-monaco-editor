@@ -32,6 +32,11 @@ function harness(initialProps = {}) {
   const context = { exports: {}, require(name) {
     if (name === 'vue') return Vue
     if (name === 'ramda') return Ramda
+    if (name.endsWith('/sync-monaco-options')) {
+      const helper = { exports: {}, require: () => Ramda }
+      vm.runInNewContext(ts.transpileModule(fs.readFileSync(new URL('../use.lib/sync-monaco-options.ts', import.meta.url), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText, helper)
+      return helper.exports
+    }
     if (name.startsWith('monaco-editor')) return Monaco
     if (name === './config') return { vmoMonacoEditorDefaultOption: { language: 'typescript', theme: 'vs-dark' } }
     if (name === '../../index') return { useReminderPlugin: () => () => ({ provideCompletionItems: () => ({ suggestions: ['local'] }) }) }
@@ -88,4 +93,23 @@ test('caller-owned models are retained on unmount', async () => {
   await Vue.nextTick()
   h.app.unmount()
   assert.equal(h.editors[0].disposed, true)
+})
+
+test('language choice survives equivalent inline props and other external option changes', async () => {
+  const h = harness({ monacoOptions: { language: 'sql', theme: 'vs-light', minimap: { enabled: true } } })
+  await Vue.nextTick()
+  h.editorRef.value.changeLanguage('javascript')
+  await Vue.nextTick()
+  h.props.monacoOptions = { language: 'sql', theme: 'vs-light', minimap: { enabled: true } }
+  await Vue.nextTick()
+  assert.equal(h.editorRef.value.computedMonacoEditorOption.language, 'javascript')
+  assert.equal(h.editors[0].model.language, 'javascript')
+  h.props.monacoOptions.theme = 'vs-dark'
+  await Vue.nextTick()
+  assert.equal(h.editorRef.value.computedMonacoEditorOption.language, 'javascript')
+  h.props.monacoOptions.language = 'python'
+  await Vue.nextTick()
+  assert.equal(h.editorRef.value.computedMonacoEditorOption.language, 'python')
+  assert.equal(h.editors[0].model.language, 'python')
+  h.app.unmount()
 })

@@ -1,0 +1,2 @@
+[   22964ms] [LOG] [vite] server connection lost. Polling for restart... @ http://127.0.0.1:1980/@vite/client:555
+[   23076ms] [INFO] Slow network is detected. See https://www.chromestatus.com/feature/5636954674692096 for more details. Fallback font will be used while loading: http://127.0.0.1:1980/assets/iconfont/iconfont.woff2?t=1783074534105 @ http://127.0.0.1:1980/node_modules/.vite/deps/chunk-GPRYTD55.js?v=1ae9feb4:39720

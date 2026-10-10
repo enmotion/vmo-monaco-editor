@@ -7,9 +7,9 @@ import * as Vue from 'vue'
 import { compile } from '@vue/compiler-dom'
 import { renderToString } from '@vue/server-renderer'
 
-async function render(mode, changes, pending = false) {
+async function render(mode, changes, pending = false, hasPreview = false) {
   const source = fs.readFileSync(new URL('../components/vmo-monaco-ui/controls/diff-review.vue', import.meta.url), 'utf8')
-  const target = { currentDisplayMode: mode, currentDiffViewMode: 'inline', lineChanges: changes, diffPending: pending, acceptAllChanges() {}, getLineChanges: () => changes }
+  const target = { hasPreview, currentDisplayMode: mode, currentDiffViewMode: 'inline', lineChanges: changes, diffPending: pending, acceptAllChanges() {}, getLineChanges: () => changes }
   const context = { exports: {}, require(name) {
     if (name === 'vue') return Vue
     if (name === './use-monaco-control') return { createVmoMonacoControlProps: () => ({}), useVmoMonacoControl: () => ({ monacos: Vue.ref([target]) }) }
@@ -49,4 +49,14 @@ test('review controls disabled for zero differences or pending calculation', asy
     assert.match(html, /aria-label="Accept all" disabled/)
     assert.match(html, /aria-label="Reject all" disabled/)
   }
+})
+
+
+test('review popover has no Preview switch even when preview is available', async () => {
+  for (const mode of ['original', 'modified', 'diff', 'preview']) {
+    const html = await render(mode, [{}], false, true)
+    assert.doesNotMatch(html, /title="Preview"|reviewPreviewButton/)
+  }
+  const preview = await render('preview', [{}], false, true)
+  assert.doesNotMatch(preview, /reviewCount|title="Side by side"|title="Inline"|title="Accept all"|title="Reject all"/)
 })

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { VmoMonacoDiffEditor, VmoMonacoEditor, VmoMonacoUi, useReminderPlugin } from '../index'
+import { VmoMonacoDiffEditor, VmoMonacoEditor, VmoMonacoUi, VmoMonacoPreviewToggle, VmoTextPreview, useReminderPlugin } from '../index'
 import * as Monaco from 'monaco-editor'
 import fontSizeInput from '@comps/vmo-monaco-ui/controls/font-size-input.vue'
 import themeToggle from '@comps/vmo-monaco-ui/controls/theme-toggle.vue'
@@ -161,6 +161,7 @@ const remindConfig = ref([
           language: 'plaintext',
           wordWrap: 'on',
           fontSize: 14,
+          showUnused: false,
           minimap: {
             enabled: false
           }
@@ -175,6 +176,8 @@ const remindConfig = ref([
           title="Text-Diff"
           :monaco="[vmoMonacoDiffEditorInstance,vmoMonacoEditorInstance2]"
           :config="{
+            language:true,
+            languages:['sql','javascript','typescript'],
             theme: true,
             lineNumbers: true,
             minimap: true,
@@ -182,18 +185,10 @@ const remindConfig = ref([
             fullScreen: true,
             reviewActions: true
           }">
-          <div class="flex-row flex grow items-center justify-between">
-            <div>aaa</div>
-            <div class="flex-row flex h-[20px]">
-              <!-- <commit-button></commit-button> -->
-              <minimap-toggle></minimap-toggle>
-              <diff-review></diff-review>
-              <fontSizeInput class="h-[20px]"></fontSizeInput>
-              <theme-toggle></theme-toggle>
-              <span @click="modifiedContent='KKEE'">aaa</span>
-            </div>
-          </div>  
         </vmo-monaco-ui>
+        <template #preview="{ content, theme }">
+          <vmo-text-preview :content="content" :theme="theme" />
+        </template>
       </vmo-monaco-diff-editor>
       <vmo-monaco-diff-editor
         ref="vmoMonacoEditorInstance2"

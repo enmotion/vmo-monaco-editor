@@ -9,8 +9,9 @@
         <span class="title">{{ title }}</span>
         <span class="setting">
           <!-- 默认控件不再由 UI 容器承接事件；它们通过 inject 到的 monaco 自行调用 editor public API。 -->
-          <language-select v-if="!!config.languages && config.languages.length>1" :config="languageControlConfig" />
+          <language-select v-if="languageVisible" :config="languageControlConfig" />
           <font-size-input v-if="!!config?.fontSize" :config="fontSizeControlConfig" />
+          <preview-toggle v-if="config.preview !== false" />
           <diff-review v-if="!!config?.reviewActions" :config="reviewActionsControlConfig">
             <template v-if="$slots['review-actions']" #default="slotProps">
               <slot name="review-actions" v-bind="slotProps"></slot>
@@ -79,6 +80,7 @@ import MinimapToggle from './controls/minimap-toggle.vue'
 import LineNumbersToggle from './controls/line-numbers-toggle.vue'
 import CommitButton from './controls/commit-button.vue'
 import DiffReview from './controls/diff-review.vue'
+import PreviewToggle from './controls/preview-toggle.vue'
 import type { VmoMonacoLanguageControlConfig } from './controls/language-select.vue'
 import type { VmoMonacoFontSizeControlConfig } from './controls/font-size-input.vue'
 import type { VmoMonacoThemeControlConfig } from './controls/theme-toggle.vue'
@@ -101,6 +103,7 @@ export type MonacoUIConfig = {
   lineNumbers: boolean | VmoMonacoLineNumbersControlConfig
   fullScreen: boolean | VmoMonacoFullScreenControlConfig
   commit: boolean | VmoMonacoCommitControlConfig
+  preview: boolean
   reviewActions: boolean | VmoMonacoDiffReviewControlConfig
   language: boolean | VmoMonacoLanguageControlConfig
   languages: string[]
@@ -117,7 +120,8 @@ export default defineComponent({
     MinimapToggle,
     LineNumbersToggle,
     CommitButton,
-    DiffReview
+    DiffReview,
+    PreviewToggle
   },
   props: {
     title: {
@@ -165,6 +169,7 @@ export default defineComponent({
       return props.config?.languages ? { languages: props.config.languages } : undefined
     })
     const languageVisible = computed(() => {
+      if (props.config.language === false) return false
       const languages = languageControlConfig.value?.languages || []
       return languages.length > 1
     })

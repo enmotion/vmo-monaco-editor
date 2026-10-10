@@ -1,6 +1,7 @@
 import type * as Monaco from 'monaco-editor'
 
-export type VmoMonacoDiffDisplayMode = 'original' | 'modified' | 'diff'
+export type VmoMonacoDiffDisplayMode = 'original' | 'modified' | 'diff' | 'preview'
+export type VmoMonacoPreviewSource = 'original' | 'modified'
 export type VmoMonacoDiffViewMode = 'side-by-side' | 'inline'
 
 export type VmoMonacoDiffChangePayload = {

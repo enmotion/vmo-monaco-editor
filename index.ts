@@ -1,3 +1,10 @@
+import VmoMonacoPreviewToggle from '@comps/vmo-monaco-ui/controls/preview-toggle.vue'
+export type { VmoMonacoPreviewControlValue, VmoMonacoPreviewControlConfig } from '@comps/vmo-monaco-ui/controls/preview-toggle.vue'
+export type { VmoMonacoPreviewSource } from '@comps/vmo-monaco-diff-editor/types'
+import VmoTextPreview from '@comps/vmo-preview/vmo-text-preview.vue'
+import VmoCodePreview from '@comps/vmo-preview/vmo-code-preview.vue'
+import VmoMarkdownPreview from '@comps/vmo-preview/vmo-markdown-preview.vue'
+export type { VmoPreviewTheme, VmoMarkdownRender, VmoCodePreviewOptions } from '@comps/vmo-preview/types'
 import VmoMonacoEditor from '@comps/vmo-monaco-editor/vmo-monaco-editor.vue'
 import VmoMonacoDiffEditor from '@comps/vmo-monaco-diff-editor/vmo-monaco-diff-editor.vue'
 import VmoMonacoUi from '@comps/vmo-monaco-ui/vmo-monaco-ui.vue'
@@ -75,6 +82,10 @@ function useReminderPlugin(language?: 'sql' | 'python' | 'groovy') {
 }
 // import { initMonacoEnvironment } from '@lib/monaco-editor-inti'
 export {
+  VmoMonacoPreviewToggle,
+  VmoTextPreview,
+  VmoCodePreview,
+  VmoMarkdownPreview,
   VmoMonacoContext,
   VmoMonacoContextMethod,
   VmoMonacoContextObject,

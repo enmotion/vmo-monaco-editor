@@ -1,0 +1,2 @@
+[  505030ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://127.0.0.1:1980/src/App.vue?t=1791604746101:0
+[  505030ms] [ERROR] [hmr] Failed to reload /src/App.vue. This could be due to syntax errors or importing non-existent modules. (see errors above) @ http://127.0.0.1:1980/@vite/client:175

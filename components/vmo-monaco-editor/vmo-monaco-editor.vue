@@ -67,6 +67,7 @@ import type { PropType, StyleValue } from 'vue'
 import { useReminderPlugin } from '../../index'
 import type { VmoMonacoContext } from '@type'
 import * as Monaco from 'monaco-editor'
+import { syncMonacoOptions } from '../../use.lib/sync-monaco-options'
 import { vmoMonacoEditorDefaultOption } from './config'
 
 export default defineComponent({
@@ -168,16 +169,25 @@ export default defineComponent({
     }
     watch(() => props.remindConfig, refreshCompletionProviders, { deep: true })
 
-    // 深度监听触发时直接复制配置；原地修改对象时新旧引用相同，不能用 equals 跳过。
+    // 保存外部配置快照，区分深层变更和父组件重渲染，保留工具栏的内部选择。
+    let previousMonacoOptions: typeof props.monacoOptions | undefined
     watch(
       () => props.monacoOptions,
       n => {
         if (n) {
-          monacoEditorOptions.value = clone(n)
+          monacoEditorOptions.value = syncMonacoOptions(monacoEditorOptions.value, n, previousMonacoOptions)
+          previousMonacoOptions = clone(n)
         }
       },
       { immediate: true, deep: true }
     )
+    watch(() => computedMonacoEditorOption.value.language, language => {
+      const model = monacoEditorInstance.value?.getModel()
+      if (model && language && model.getLanguageId() != language) {
+        Monaco.editor.setModelLanguage(model, language)
+        refreshCompletionProviders()
+      }
+    })
     // Monaco editor 创建后，大部分配置可以通过 updateOptions 热更新，不需要销毁重建。
     // disabled 也通过 readOnly 合并进同一次 updateOptions，确保外部禁用状态立即生效。
     watch(
@@ -331,6 +341,7 @@ export default defineComponent({
     function changeLanguage(language: string) {
       const model = monacoEditorInstance.value?.getModel()
       !!model && Monaco.editor.setModelLanguage(model, language)
+      resetMonacoEditorOptions({ language })
       refreshCompletionProviders()
     }
     // setup return 的这些字段就是组件实例 ref 能访问到的 public API。

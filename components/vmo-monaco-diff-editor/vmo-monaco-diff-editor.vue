@@ -16,7 +16,16 @@
           <span v-html="prefix" class="extra-code"></span>
         </div>
       </slot>
-      <div ref="MonacoEditorRef" class="ide-container"></div>
+      <div v-show="currentDisplayMode != 'preview'" ref="MonacoEditorRef" class="ide-container"></div>
+      <div v-if="currentDisplayMode == 'preview'" class="vmo-preview-container">
+        <div v-if="!!modifiedInnerValue" class="vmo-preview-source" role="group" aria-label="Preview source">
+          <button type="button" :aria-pressed="currentPreviewSource == 'original'" @click="changePreviewSource('original')">Original</button>
+          <button type="button" :aria-pressed="currentPreviewSource == 'modified'" @click="changePreviewSource('modified')">Proposal</button>
+        </div>
+        <div class="vmo-preview-content">
+          <slot name="preview" :content="previewContent" :language="previewLanguage" :source="currentPreviewSource" :theme="computedMonacoEditorOption.theme"></slot>
+        </div>
+      </div>
       <slot v-if="!!suffix || context.slots.suffix" name="suffix" :option="computedMonacoEditorOption">
         <div :class="['suffix']">
           <span v-html="suffix" class="extra-code"></span>
@@ -51,6 +60,21 @@
 .vmo-monaco-editor-container .ide-container {
   @apply flex flex-col h-0 flex-grow;
 }
+.vmo-monaco-editor-container .vmo-preview-container {
+  @apply flex flex-col flex-grow h-0 min-h-0;
+}
+.vmo-monaco-editor-container .vmo-preview-source {
+  @apply flex flex-row gap-[6px] p-[8px] border-b border-[#88888833];
+}
+.vmo-monaco-editor-container .vmo-preview-source button {
+  @apply px-[8px] py-[4px] rounded border border-[#88888844];
+}
+.vmo-monaco-editor-container .vmo-preview-source button[aria-pressed='true'] {
+  @apply text-[#00BB55] border-[#00BB5588];
+}
+.vmo-monaco-editor-container .vmo-preview-content {
+  @apply flex-grow min-h-0 overflow-auto;
+}
 .vmo-monaco-editor-container .codicon.codicon-light-bulb.lightbulb-glyph {
   @apply hidden pointer-events-none;
 }
@@ -60,13 +84,14 @@
 </style>
 
 <script lang="ts">
-import { defineComponent, ref, shallowRef, onMounted, onBeforeUnmount, watch, computed, nextTick, getCurrentInstance } from 'vue'
+import { defineComponent, ref, shallowRef, onMounted, onBeforeUnmount, onBeforeUpdate, watch, computed, nextTick, getCurrentInstance } from 'vue'
 import { mergeDeepRight, clone, isNil } from 'ramda'
 import 'monaco-editor/esm/vs/basic-languages/css/css.contribution'
 import 'monaco-editor/esm/vs/basic-languages/xml/xml.contribution'
 import 'monaco-editor/esm/vs/basic-languages/javascript/javascript.contribution'
 import type { PropType } from 'vue'
 import * as Monaco from 'monaco-editor'
+import { syncMonacoOptions } from '../../use.lib/sync-monaco-options'
 import { vmoMonacoEditorDefaultOption } from '../vmo-monaco-editor/config'
 import {
   applyLineChange as applyReviewLineChange,
@@ -85,7 +110,8 @@ import type {
   VmoMonacoNormalEditor,
   VmoMonacoReviewAction,
   VmoMonacoReviewActionMaps,
-  VmoMonacoReviewSide
+  VmoMonacoReviewSide,
+  VmoMonacoPreviewSource
 } from './types'
 
 const DEFAULT_ORIGINAL_URI = 'vmo-monaco-diff-original'
@@ -122,6 +148,10 @@ export default defineComponent({
     displayMode: {
       type: String as PropType<VmoMonacoDiffDisplayMode>,
       default: 'diff'
+    },
+    previewSource: {
+      type: String as PropType<VmoMonacoPreviewSource>,
+      default: undefined
     },
     diffViewMode: {
       type: String as PropType<VmoMonacoDiffViewMode>,
@@ -185,6 +215,7 @@ export default defineComponent({
     'confirm',
     'focuse',
     'blur',
+    'preview-source-change',
     'mode-change'
   ],
   setup(props, context) {
@@ -204,7 +235,11 @@ export default defineComponent({
     // ===== 视图模式 =====
     // displayMode 控制只看确认稿、只看候选稿、或进入 diff 审阅。
     // diffViewMode 只影响 diff 模式下的并排/混合渲染。
-    const currentDisplayMode = ref(props.displayMode)
+    const hasPreview = ref(!!context.slots?.preview)
+    const currentDisplayMode = ref(props.displayMode == 'preview' && !hasPreview.value ? 'modified' : props.displayMode)
+    let previousEditorMode: Exclude<VmoMonacoDiffDisplayMode, 'preview'> = props.displayMode == 'preview'
+      ? props.previewSource || 'modified' : props.displayMode
+    const currentPreviewSource = ref<VmoMonacoPreviewSource>(props.previewSource || (props.displayMode == 'original' ? 'original' : 'modified'))
     const currentDiffViewMode = ref(props.diffViewMode)
 
     // ===== 审阅状态 =====
@@ -219,6 +254,8 @@ export default defineComponent({
     // needConfirm=false 时 model 变化会立刻同步；needConfirm=true 时由 confirm/commit 输出。
     const originalInnerValue = ref('')
     const modifiedInnerValue = ref('')
+    const previewContent = computed(() => currentPreviewSource.value == 'original' ? originalInnerValue.value : modifiedInnerValue.value)
+    const previewLanguage = computed(() => computedMonacoEditorOption.value.language || 'plaintext')
 
     // ===== 资源释放 =====
     // Monaco editor/model 的事件都要手动 dispose，避免模式切换后重复触发。
@@ -252,15 +289,23 @@ export default defineComponent({
       }) as Partial<Monaco.editor.IStandaloneDiffEditorConstructionOptions>
     })
 
+    let previousMonacoOptions: typeof props.monacoOptions | undefined
     watch(
       () => props.monacoOptions,
       n => {
         if (n) {
-          monacoEditorOptions.value = clone(n)
+          monacoEditorOptions.value = syncMonacoOptions(monacoEditorOptions.value, n, previousMonacoOptions)
+          previousMonacoOptions = clone(n)
         }
       },
       { immediate: true, deep: true }
     )
+    watch(() => computedMonacoEditorOption.value.language, language => {
+      if (!language) return
+      for (const model of [originalModel.value, modifiedModel.value]) {
+        if (model && model.getLanguageId() != language) Monaco.editor.setModelLanguage(model, language)
+      }
+    })
     watch(
       () => props.diffOptions,
       n => {
@@ -289,11 +334,7 @@ export default defineComponent({
     watch(
       () => props.displayMode,
       mode => {
-        if (mode != currentDisplayMode.value) {
-          currentDisplayMode.value = mode
-          refreshMonacoEditor()
-          context.emit('mode-change', mode)
-        }
+        changeDisplayMode(mode)
       }
     )
     watch(
@@ -323,6 +364,14 @@ export default defineComponent({
         }
       }
     )
+
+    watch(() => props.previewSource, source => {
+      if (source) changePreviewSource(source)
+    })
+    onBeforeUpdate(() => {
+      hasPreview.value = !!context.slots?.preview
+      if (!hasPreview.value && currentDisplayMode.value == 'preview') changeDisplayMode('modified')
+    })
 
     // 初始化时先创建两个稳定 model，再根据 displayMode 创建对应 editor view。
     // 后续切模式只销毁/重建 editor view，不销毁 model，避免丢失用户编辑内容。
@@ -371,6 +420,11 @@ export default defineComponent({
       disposeEditor()
       if (!MonacoEditorRef.value || !originalModel.value || !modifiedModel.value) return
 
+      if (currentDisplayMode.value == 'preview') {
+        createBackgroundDiffEditor()
+        return
+      }
+
       if (currentDisplayMode.value == 'diff') {
         const instance = Monaco.editor.createDiffEditor(
           MonacoEditorRef.value,
@@ -401,6 +455,12 @@ export default defineComponent({
       monacoEditorInstance.value = instance
       bindNormalEditorEvents(instance)
       updateCurrentEditorOptions()
+      createBackgroundDiffEditor()
+      layoutCurrentEditor()
+    }
+
+    function createBackgroundDiffEditor() {
+      if (!originalModel.value || !modifiedModel.value) return
       // Use Monaco's own diff engine while the visible editor shows just one model.
       // The detached view never enters the page or receives user input.
       const comparison = Monaco.editor.createDiffEditor(document.createElement('div'), {
@@ -413,7 +473,6 @@ export default defineComponent({
       backgroundDiffEditor.value = comparison
       bindDiffCalculation(comparison)
       comparison.setModel({ original: originalModel.value, modified: modifiedModel.value })
-      layoutCurrentEditor()
     }
 
     function createModelUri(uri: string, defaultUri: string) {
@@ -704,12 +763,28 @@ export default defineComponent({
       resetMonacoEditorOptions({ language })
     }
 
+    function changePreviewSource(source: VmoMonacoPreviewSource) {
+      if (source != currentPreviewSource.value) {
+        currentPreviewSource.value = source
+        context.emit('preview-source-change', source)
+      }
+    }
+
     function changeDisplayMode(mode: VmoMonacoDiffDisplayMode) {
+      if (mode == 'preview' && !hasPreview.value) return
       if (mode != currentDisplayMode.value) {
+        if (mode == 'preview') {
+          previousEditorMode = currentDisplayMode.value as Exclude<VmoMonacoDiffDisplayMode, 'preview'>
+          changePreviewSource(props.previewSource || (currentDisplayMode.value == 'original' ? 'original' : 'modified'))
+        }
         currentDisplayMode.value = mode
         refreshMonacoEditor()
         context.emit('mode-change', mode)
       }
+    }
+
+    function togglePreview() {
+      changeDisplayMode(currentDisplayMode.value == 'preview' ? previousEditorMode : 'preview')
     }
 
     function changeDiffViewMode(mode: VmoMonacoDiffViewMode) {
@@ -749,6 +824,12 @@ export default defineComponent({
       monacoEditorOptions,
       mergeDeepRight,
       currentDisplayMode,
+      hasPreview,
+      currentPreviewSource,
+      modifiedInnerValue,
+      previewContent,
+      previewLanguage,
+      changePreviewSource,
       currentDiffViewMode,
       lineChanges,
       diffPending,
@@ -765,6 +846,7 @@ export default defineComponent({
       rejectAllChanges,
       changeLanguage,
       changeDisplayMode,
+      togglePreview,
       changeDiffViewMode,
       getOriginalEditor,
       getModifiedEditor,

@@ -14,6 +14,7 @@
         :line-changes="lineChanges"
         :diff-pending="diffPending"
         :current-display-mode="currentDisplayMode"
+        :has-preview="hasPreview"
         :accept-change="acceptChange"
         :reject-change="rejectChange"
         :accept-all-changes="acceptAllChanges"
@@ -47,9 +48,9 @@
             <span class="reviewPanelIcon"></span>
           </button>
         </span>
-        <div class="flex flex-row items-center gap-[5px]">
+        <div v-if="currentDisplayMode != 'preview'" class="flex flex-row items-center gap-[5px]">
            <span
-            v-if="currentDisplayMode != 'diff'"
+            v-if="currentDisplayMode == 'original' || currentDisplayMode == 'modified'"
             class="reviewCount"
             :title="diffPending ? 'Calculating differences' : `${lineChanges.length} diff blocks`"
             :aria-label="diffPending ? 'Calculating differences' : `${lineChanges.length} diff blocks`"
@@ -162,6 +163,7 @@ export default defineComponent({
     const currentDisplayMode = computed(() => {
       return primaryDiffMonaco.value?.currentDisplayMode || 'diff'
     })
+    const hasPreview = computed(() => primaryDiffMonaco.value?.hasPreview ?? false)
     const currentDiffViewMode = computed(() => {
       return primaryDiffMonaco.value?.currentDiffViewMode || 'side-by-side'
     })
@@ -192,7 +194,7 @@ export default defineComponent({
     }
 
     function changeDisplayMode(mode: VmoMonacoDiffEditorExpose['currentDisplayMode']) {
-      diffMonacos.value.forEach(monaco => monaco.changeDisplayMode(mode))
+      diffMonacos.value.filter(monaco => mode != 'preview' || monaco.hasPreview).forEach(monaco => monaco.changeDisplayMode(mode))
       context.emit('display-mode-change', createPayload('display-mode-change', undefined, { mode }))
     }
 
@@ -249,6 +251,7 @@ export default defineComponent({
       diffPending,
       canReview,
       currentDisplayMode,
+      hasPreview,
       currentDiffViewMode,
       togglePanel,
       acceptChange,

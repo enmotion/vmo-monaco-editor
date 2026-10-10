@@ -1,6 +1,7 @@
 <template>
   <span class="languages">
     <select :value="currentValue" @change="handleChange">
+      <option v-if="currentValue && !currentLanguages.includes(currentValue)" :value="currentValue" disabled>{{ currentValue }}</option>
       <option v-for="item in currentLanguages" :key="item" :value="item">{{ item }}</option>
     </select>
   </span>
@@ -43,9 +44,6 @@ export default defineComponent({
       const language = (event.target as HTMLSelectElement).value
       eachMonaco(monaco => {
         monaco.changeLanguage(language)
-        monaco.resetMonacoEditorOptions({
-          language
-        })
       })
       context.emit('update:value', language)
       context.emit('update:modelValue', language)
