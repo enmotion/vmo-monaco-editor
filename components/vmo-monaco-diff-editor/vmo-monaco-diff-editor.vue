@@ -61,7 +61,7 @@
 
 <script lang="ts">
 import { defineComponent, ref, shallowRef, onMounted, onBeforeUnmount, watch, computed, nextTick, getCurrentInstance } from 'vue'
-import { mergeDeepRight, equals, clone, isNil } from 'ramda'
+import { mergeDeepRight, clone, isNil } from 'ramda'
 import 'monaco-editor/esm/vs/basic-languages/css/css.contribution'
 import 'monaco-editor/esm/vs/basic-languages/xml/xml.contribution'
 import 'monaco-editor/esm/vs/basic-languages/javascript/javascript.contribution'
@@ -211,6 +211,7 @@ export default defineComponent({
     // lineChanges 来自 Monaco diff 结果；reviewActionMaps 负责把原生 +/- 点击映射回 change index。
     const lineChanges = ref([] as Monaco.editor.ILineChange[])
     const reviewActionMaps = ref(createEmptyReviewActionMaps())
+    let diffVersions: [number, number] | null = null
 
     // ===== 内容缓存 =====
     // needConfirm=false 时 model 变化会立刻同步；needConfirm=true 时由 confirm/commit 输出。
@@ -230,19 +231,11 @@ export default defineComponent({
     const diffEditorOptions = ref({} as Partial<Monaco.editor.IStandaloneDiffEditorConstructionOptions>)
 
     // 最终普通 editor 配置；用于 original/modified 单独显示模式，也作为 diff editor 的基础配置来源。
-    const computedMonacoEditorOption = computed(() => {
+    const computedMonacoEditorOption = computed<Partial<Monaco.editor.IStandaloneEditorConstructionOptions & { theme: 'vs-dark' | 'vs-light' }>>(() => {
       monacoEditorOptions.value
-      return JSON.parse(
-        JSON.stringify(
-          mergeDeepRight(
-            vmoMonacoEditorDefaultOption,
-            mergeDeepRight(monacoEditorOptions.value, {
-              lightbulb: {
-                enabled: false
-              }
-            })
-          )
-        )
+      return mergeDeepRight(
+        vmoMonacoEditorDefaultOption,
+        mergeDeepRight(monacoEditorOptions.value, { lightbulb: { enabled: false } })
       )
     })
     const computedDiffEditorOption = computed(() => {
@@ -259,8 +252,8 @@ export default defineComponent({
 
     watch(
       () => props.monacoOptions,
-      (n, o) => {
-        if (!!n && !equals(n, o)) {
+      n => {
+        if (n) {
           monacoEditorOptions.value = clone(n)
         }
       },
@@ -268,8 +261,8 @@ export default defineComponent({
     )
     watch(
       () => props.diffOptions,
-      (n, o) => {
-        if (!!n && !equals(n, o)) {
+      n => {
+        if (n) {
           diffEditorOptions.value = clone(n)
         }
       },
@@ -358,10 +351,12 @@ export default defineComponent({
       )
       modelDisposables.value = [
         originalModel.value.onDidChangeContent(() => {
+          diffVersions = null
           originalInnerValue.value = originalModel.value?.getValue() || ''
           !props.needConfirm && context.emit('update:originalValue', originalInnerValue.value)
         }),
         modifiedModel.value.onDidChangeContent(() => {
+          diffVersions = null
           modifiedInnerValue.value = modifiedModel.value?.getValue() || ''
           !props.needConfirm && context.emit('update:modifiedValue', modifiedInnerValue.value)
         })
@@ -444,6 +439,7 @@ export default defineComponent({
     function bindDiffEditorEvents(editor: VmoMonacoDiffEditor) {
       editorDisposables.value.push(
         editor.onDidUpdateDiff(() => {
+          diffVersions = [originalModel.value!.getVersionId(), modifiedModel.value!.getVersionId()]
           refreshLineChanges()
           refreshReviewActionMaps()
         }),
@@ -516,7 +512,7 @@ export default defineComponent({
     // 从 Monaco diff editor 读取最新差异块。
     function refreshLineChanges() {
       const editor = getDiffEditor()
-      lineChanges.value = editor?.getLineChanges() || []
+      lineChanges.value = hasCurrentDiff() ? editor?.getLineChanges() || [] : []
     }
 
     // 生成原生 +/- 点击到 lineChanges index 的映射。
@@ -530,6 +526,7 @@ export default defineComponent({
     }
 
     function handleReviewActionMouseDown(event: Monaco.editor.IEditorMouseEvent, side: VmoMonacoReviewSide) {
+      if (!props.showReviewActions || !hasCurrentDiff()) return
       const action = getNativeDiffAction(event, MonacoEditorRef.value)
       if (!action) return
       const lineNumber = event.target.position?.lineNumber || event.target.range?.startLineNumber
@@ -548,6 +545,7 @@ export default defineComponent({
     }
 
     function disposeEditor() {
+      diffVersions = null
       clearReviewActionMaps()
       editorDisposables.value.map(item => item.dispose())
       editorDisposables.value = []
@@ -640,7 +638,13 @@ export default defineComponent({
       applyLineChange(index, 'reject')
     }
 
+    function hasCurrentDiff() {
+      return !!diffVersions && diffVersions[0] === originalModel.value?.getVersionId() &&
+        diffVersions[1] === modifiedModel.value?.getVersionId()
+    }
+
     function applyLineChange(index: number, action: VmoMonacoReviewAction) {
+      if (!hasCurrentDiff()) return
       const lineChange = applyReviewLineChange(
         {
           lineChanges: lineChanges.value,

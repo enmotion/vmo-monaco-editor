@@ -7,7 +7,8 @@ const languageTypes: string[] = []
 const languageOperators: string[] = []
 const contextObjects: VmoMonacoContextObject[] = []
 export default function RegisterCompletionItemProvider(
-  extra: Partial<VmoMonacoContext>
+  extra: Partial<VmoMonacoContext>,
+  targetModel?: Monaco.editor.ITextModel
 ): Monaco.languages.CompletionItemProvider {
   const types = languageTypes.concat(extra?.types || [])
   const operators = languageOperators.concat(extra?.operators || [])
@@ -16,6 +17,7 @@ export default function RegisterCompletionItemProvider(
   const objects = contextObjects.concat(extra?.objects || [])
   return {
     provideCompletionItems: function (model, position): any {
+      if (targetModel && targetModel !== model) return { suggestions: [] }
       return computedCompletionItems(model, position, {
         types,
         operators,

@@ -94,25 +94,40 @@ export function applyLineChange(
 
   const sourceModel = action == 'accept' ? params.modifiedModel : params.originalModel
   const targetModel = action == 'accept' ? params.originalModel : params.modifiedModel
-  const sourceRange =
-    action == 'accept'
-      ? getLineChangeRange(sourceModel, lineChange.modifiedStartLineNumber, lineChange.modifiedEndLineNumber)
-      : getLineChangeRange(sourceModel, lineChange.originalStartLineNumber, lineChange.originalEndLineNumber)
-  const targetRange =
-    action == 'accept'
-      ? getLineChangeRange(targetModel, lineChange.originalStartLineNumber, lineChange.originalEndLineNumber)
-      : getLineChangeRange(targetModel, lineChange.modifiedStartLineNumber, lineChange.modifiedEndLineNumber)
+  const sourceStart = action == 'accept' ? lineChange.modifiedStartLineNumber : lineChange.originalStartLineNumber
+  const sourceEnd = action == 'accept' ? lineChange.modifiedEndLineNumber : lineChange.originalEndLineNumber
+  const targetStart = action == 'accept' ? lineChange.originalStartLineNumber : lineChange.modifiedStartLineNumber
+  const targetEnd = action == 'accept' ? lineChange.originalEndLineNumber : lineChange.modifiedEndLineNumber
 
-  targetModel.pushEditOperations(
-    [],
-    [
-      {
-        range: targetRange,
-        text: sourceModel.getValueInRange(sourceRange)
-      }
-    ],
-    () => null
-  )
+  // A missing side uses start as the preceding-line anchor and end=0.
+  // Splice complete logical lines so insertion/deletion also transfers the newline.
+  const sourceLines = sourceModel.getValue().split(/\r\n|\r|\n/)
+  const targetLines = targetModel.getValue().split(/\r\n|\r|\n/)
+  const replacement = sourceEnd === 0 ? [] : sourceLines.slice(sourceStart - 1, sourceEnd)
+  const insertionIndex = targetEnd === 0 ? targetStart : targetStart - 1
+  const deleteCount = targetEnd === 0 ? 0 : targetEnd - targetStart + 1
+  const nextLines = targetLines.slice(0, insertionIndex).concat(replacement, targetLines.slice(insertionIndex + deleteCount))
+  const before = targetModel.getValue()
+  const after = nextLines.join(targetModel.getEOL())
+  if (before === after) return lineChange
+
+  // Apply only the changed span and retain Monaco's undo history.
+  let start = 0
+  while (start < before.length && start < after.length && before[start] === after[start]) start++
+  let beforeEnd = before.length
+  let afterEnd = after.length
+  while (beforeEnd > start && afterEnd > start && before[beforeEnd - 1] === after[afterEnd - 1]) {
+    beforeEnd--
+    afterEnd--
+  }
+  const startPosition = targetModel.getPositionAt(start)
+  const endPosition = targetModel.getPositionAt(beforeEnd)
+  targetModel.pushStackElement()
+  targetModel.pushEditOperations([], [{
+    range: new Monaco.Range(startPosition.lineNumber, startPosition.column, endPosition.lineNumber, endPosition.column),
+    text: after.slice(start, afterEnd)
+  }], () => null)
+  targetModel.pushStackElement()
 
   return lineChange
 }

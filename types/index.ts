@@ -31,6 +31,7 @@ export type VmoMonacoEditorExpose = {
   computedMonacoEditorOption: VmoMonacoEditorOption
   isFullScreen: boolean
   needConfirm: boolean
+  refreshMonacoEditor: () => void
 }
 
 export type VmoMonacoDiffEditorExpose = VmoMonacoEditorExpose & {

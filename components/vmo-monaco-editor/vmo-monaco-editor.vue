@@ -58,8 +58,8 @@
 </style>
 
 <script lang="ts">
-import { defineComponent, ref, shallowRef, onMounted, watch, computed, readonly, nextTick } from 'vue'
-import { mergeDeepRight, equals, clone, isNil } from 'ramda'
+import { defineComponent, ref, shallowRef, onMounted, onBeforeUnmount, watch, computed, readonly, nextTick } from 'vue'
+import { mergeDeepRight, clone, isNil } from 'ramda'
 import 'monaco-editor/esm/vs/basic-languages/css/css.contribution'
 import 'monaco-editor/esm/vs/basic-languages/xml/xml.contribution'
 import 'monaco-editor/esm/vs/basic-languages/javascript/javascript.contribution'
@@ -135,41 +135,44 @@ export default defineComponent({
       {} as Partial<Monaco.editor.IStandaloneEditorConstructionOptions & { theme: 'vs-dark' | 'vs-light' }>
     )
     // 最终配置 = 默认配置 + 当前配置。外部和 UI 控件都只修改 monacoEditorOptions。
-    const computedMonacoEditorOption = computed(() => {
+    const computedMonacoEditorOption = computed<Partial<Monaco.editor.IStandaloneEditorConstructionOptions & { theme: 'vs-dark' | 'vs-light' }>>(() => {
       monacoEditorOptions.value
-      return JSON.parse(JSON.stringify(mergeDeepRight(vmoMonacoEditorDefaultOption, monacoEditorOptions.value)))
+      return mergeDeepRight(vmoMonacoEditorDefaultOption, monacoEditorOptions.value)
     })
-    watch(
-      () => props.remindConfig,
-      (n, o) => {
-        if (!!n) {
-          completionProvider.value
-            .map(item => {
-              return item.dispose()
-            })
-            .filter(item => item != undefined)
-          completionProvider.value = []
-          nextTick(() => {
-            props.remindConfig.map((item, index) => {
-              const reminder = useReminderPlugin(item.language)
-              const targetModel = monacoEditorInstance.value?.getModel() as Monaco.editor.ITextModel
-              if (targetModel) {
-                completionProvider.value[index] = Monaco.languages.registerCompletionItemProvider(
-                  item.language as string,
-                  reminder(item.extra, targetModel)
-                )
+    let ownedModel: Monaco.editor.ITextModel | null = null
+    let mounted = false
+    let reminderRevision = 0
+    function disposeCompletionProviders() {
+      completionProvider.value.forEach(provider => provider.dispose())
+      completionProvider.value = []
+    }
+    function refreshCompletionProviders() {
+      const revision = ++reminderRevision
+      disposeCompletionProviders()
+      nextTick(() => {
+        const targetModel = monacoEditorInstance.value?.getModel()
+        if (!mounted || revision !== reminderRevision || !targetModel) return
+        completionProvider.value = props.remindConfig.map(item => {
+          const provider = useReminderPlugin(item.language)(item.extra, targetModel)
+          return Monaco.languages.registerCompletionItemProvider(
+            item.language || targetModel.getLanguageId(),
+            {
+              ...provider,
+              provideCompletionItems(model, ...args) {
+                return model === targetModel ? provider.provideCompletionItems(model, ...args) : { suggestions: [] }
               }
-            })
-          })
-        }
-      },
-      { immediate: true, deep: true }
-    )
-    // 外部 monacoOptions 变化时，同步覆盖内部配置；equals 用来避免深层对象重复触发无意义更新。
+            }
+          )
+        })
+      })
+    }
+    watch(() => props.remindConfig, refreshCompletionProviders, { deep: true })
+
+    // 深度监听触发时直接复制配置；原地修改对象时新旧引用相同，不能用 equals 跳过。
     watch(
       () => props.monacoOptions,
-      (n, o) => {
-        if (!!n && !equals(n, o)) {
+      n => {
+        if (n) {
           monacoEditorOptions.value = clone(n)
         }
       },
@@ -214,16 +217,29 @@ export default defineComponent({
     )
     onMounted(() => {
       // 避免热更新或重复挂载时残留旧实例。
-      monacoEditorInstance.value?.dispose()
+      mounted = true
       initMonacoEditor(props.modelValue)
     })
+    onBeforeUnmount(() => {
+      mounted = false
+      ++reminderRevision
+      disposeCompletionProviders()
+      disposeEditor()
+    })
+    function disposeEditor() {
+      const instance = monacoEditorInstance.value
+      instance?.dispose()
+      ownedModel?.dispose()
+      ownedModel = null
+      monacoEditorInstance.value = null
+    }
     /**
      * 编辑器初始化
      * @param codeValue 编写的代码
      */
     function initMonacoEditor(codeValue: string) {
       innerValue.value = codeValue
-      monacoEditorInstance.value?.dispose()
+      disposeEditor()
       // create 只在初始化/刷新时执行；后续配置变更优先走 updateOptions。
       monacoEditorInstance.value = Monaco.editor.create(
         MonacoEditorRef.value,
@@ -232,6 +248,9 @@ export default defineComponent({
           readOnly: props.disabled
         })
       )
+      const model = monacoEditorInstance.value.getModel()
+      ownedModel = model !== computedMonacoEditorOption.value.model ? model : null
+      refreshCompletionProviders()
       /**
        * 当编辑器完成布局时，触发格式化
        */
@@ -281,7 +300,6 @@ export default defineComponent({
      * @param options 配置
      */
     function resetMonacoEditorOptions(options: Partial<Monaco.editor.IStandaloneEditorConstructionOptions>) {
-      console.log(options, 'resetMonacoEditorOptions')
       monacoEditorOptions.value = mergeDeepRight(monacoEditorOptions.value, options) as Partial<
         Monaco.editor.IStandaloneEditorConstructionOptions & { theme: 'vs-dark' | 'vs-light' }
       >
@@ -313,6 +331,7 @@ export default defineComponent({
     function changeLanguage(language: string) {
       const model = monacoEditorInstance.value?.getModel()
       !!model && Monaco.editor.setModelLanguage(model, language)
+      refreshCompletionProviders()
     }
     // setup return 的这些字段就是组件实例 ref 能访问到的 public API。
     // vmo-monaco-ui 和 controls 会依赖这层 API，而不是直接触碰 Monaco 原始实例。
