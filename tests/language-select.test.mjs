@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
-import vm from 'node:vm'
+import { transpileModule, runInNewContext } from './helpers/source-runtime.mjs'
 import ts from 'typescript'
 import * as Vue from 'vue'
 import { parse } from '@vue/compiler-sfc'
@@ -12,7 +12,7 @@ function load(file, resolve) {
   const source = fs.readFileSync(new URL(`../${file}`, import.meta.url), 'utf8')
   const { descriptor } = parse(source)
   const context = { exports: {}, require: name => name === 'vue' ? Vue : resolve(name) }
-  vm.runInNewContext(ts.transpileModule(descriptor.script.content, { compilerOptions: { module: ts.ModuleKind.CommonJS, esModuleInterop: true } }).outputText, context)
+  runInNewContext(transpileModule(descriptor.script.content, { compilerOptions: { module: ts.ModuleKind.CommonJS, esModuleInterop: true } }).outputText, context)
   const component = context.exports.default
   component.render = new Function('Vue', compile(descriptor.template.content, { mode: 'function', prefixIdentifiers: true }).code)(Vue)
   return component

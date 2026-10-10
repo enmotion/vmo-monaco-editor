@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
-import vm from 'node:vm'
+import { transpileModule, runInNewContext } from './helpers/source-runtime.mjs'
 import ts from 'typescript'
 import * as Vue from 'vue'
 import { compile } from '@vue/compiler-dom'
@@ -15,11 +15,11 @@ async function render(mode, changes, pending = false, hasPreview = false) {
     if (name === './use-monaco-control') return { createVmoMonacoControlProps: () => ({}), useVmoMonacoControl: () => ({ monacos: Vue.ref([target]) }) }
     throw new Error(name)
   } }
-  vm.runInNewContext(ts.transpileModule(source.match(/<script lang="ts">([\s\S]*?)<\/script>/)[1], { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText, context)
+  runInNewContext(transpileModule(source.match(/<script lang="ts">([\s\S]*?)<\/script>/)[1], { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText, context)
   const component = context.exports.default
   const setup = component.setup
   component.setup = (...args) => { const result = setup(...args); result.isOpen.value = true; return result }
-  component.render = new Function('Vue', compile(source.match(/<template>([\s\S]*?)<\/template>/)[1], { mode: 'function' }).code)(Vue)
+  component.render = new Function('Vue', compile(source.match(/<template>([\s\S]*?)<\/template>/)[1], { mode: 'function', prefixIdentifiers: true }).code)(Vue)
   return renderToString(Vue.h(component))
 }
 for (const mode of ['original', 'modified']) {

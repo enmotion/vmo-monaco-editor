@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
-import vm from 'node:vm'
+import { transpileModule, runInNewContext } from './helpers/source-runtime.mjs'
 import ts from 'typescript'
 
 // Execute the real helper with a text-model double; no browser or Monaco workers required.
@@ -9,7 +9,7 @@ class Range {
   constructor(sl, sc, el, ec) { Object.assign(this, { sl, sc, el, ec }) }
 }
 const context = { exports: {}, require: name => name === 'ramda' ? { isNil: x => x == null } : { Range } }
-vm.runInNewContext(ts.transpileModule(fs.readFileSync(new URL('../components/vmo-monaco-diff-editor/review.ts', import.meta.url), 'utf8'), {
+runInNewContext(transpileModule(fs.readFileSync(new URL('../components/vmo-monaco-diff-editor/review.ts', import.meta.url), 'utf8'), {
   compilerOptions: { module: ts.ModuleKind.CommonJS }
 }).outputText, context)
 function model(initial, eol = '\n') {
@@ -24,9 +24,10 @@ function model(initial, eol = '\n') {
     },
     offset(line, column) { return value.split(eol).slice(0, line - 1).reduce((sum, text) => sum + text.length + eol.length, 0) + column - 1 },
     pushStackElement() {},
-    pushEditOperations(_, edits) {
+    pushEditOperations(_, edits, computeCursorState) {
       history.push(value)
       for (const { range, text } of edits) value = value.slice(0, this.offset(range.sl, range.sc)) + text + value.slice(this.offset(range.el, range.ec))
+      assert.equal(computeCursorState([]), null)
     },
     undo() { value = history.pop() }
   }

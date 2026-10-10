@@ -1,22 +1,30 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
-import vm from 'node:vm'
+import { transpileModule, runInNewContext } from './helpers/source-runtime.mjs'
 import ts from 'typescript'
 import * as Vue from 'vue'
 import * as Ramda from 'ramda'
 
 function harness(initialProps = {}) {
-  const editors = [], providers = []
+  const editors = [], providers = [], events = []
   const Monaco = {
+    Range: class { constructor(sl, sc, el, ec) { Object.assign(this, { sl, sc, el, ec }) } },
     editor: {
       setTheme() {}, setModelLanguage(model, language) { model.language = language },
       create(_, options) {
         const model = options.model || { language: options.language, disposed: false, getLanguageId() { return this.language }, dispose() { this.disposed = true } }
         const editor = {
+          value: options.value, handlers: {}, position: { lineNumber: 1, column: 2 }, triggers: [],
           model, options, disposed: false, getModel: () => model,
+          getValue() { return this.value },
+          setValue(value) { this.value = value; this.handlers.content?.() },
+          getPosition() { return this.position },
+          executeEdits(_, edits) { this.setValue(this.value.slice(0, 1) + edits[0].text + this.value.slice(1)) },
+          trigger(...args) { this.triggers.push(args) },
           dispose() { this.disposed = true }, updateOptions(options) { this.options = options },
-          onDidLayoutChange() {}, onDidChangeModelContent() {}, onDidFocusEditorText() {}, onDidBlurEditorText() {}
+          onDidLayoutChange(fn) { this.handlers.layout = fn }, onDidChangeModelContent(fn) { this.handlers.content = fn },
+          onDidFocusEditorText(fn) { this.handlers.focus = fn }, onDidBlurEditorText(fn) { this.handlers.blur = fn }
         }
         editors.push(editor)
         return editor
@@ -34,7 +42,7 @@ function harness(initialProps = {}) {
     if (name === 'ramda') return Ramda
     if (name.endsWith('/sync-monaco-options')) {
       const helper = { exports: {}, require: () => Ramda }
-      vm.runInNewContext(ts.transpileModule(fs.readFileSync(new URL('../use.lib/sync-monaco-options.ts', import.meta.url), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText, helper)
+      runInNewContext(transpileModule(fs.readFileSync(new URL('../use.lib/sync-monaco-options.ts', import.meta.url), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText, helper)
       return helper.exports
     }
     if (name.startsWith('monaco-editor')) return Monaco
@@ -42,7 +50,7 @@ function harness(initialProps = {}) {
     if (name === '../../index') return { useReminderPlugin: () => () => ({ provideCompletionItems: () => ({ suggestions: ['local'] }) }) }
     throw new Error(name)
   } }
-  vm.runInNewContext(ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText, context)
+  runInNewContext(transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText, context)
   const component = context.exports.default
   component.render = () => null
   const renderer = Vue.createRenderer({
@@ -51,9 +59,12 @@ function harness(initialProps = {}) {
     nextSibling: () => null, patchProp() {}
   })
   const props = Vue.reactive(initialProps), editorRef = Vue.ref()
-  const app = renderer.createApp({ render: () => Vue.h(component, { ...props, ref: editorRef }) })
+  const app = renderer.createApp({ render: () => Vue.h(component, { ...props, ref: editorRef,
+    'onUpdate:modelValue': value => events.push(['update:modelValue', value]),
+    onChange: value => events.push(['change', value]), onFocuse: () => events.push(['focuse']), onBlur: () => events.push(['blur'])
+  }) })
   app.mount({})
-  return { app, props, editorRef, editors, providers }
+  return { app, props, editorRef, editors, providers, events }
 }
 
 test('refresh rebinds completion; unmount disposes models and pending registration', async () => {
@@ -111,5 +122,61 @@ test('language choice survives equivalent inline props and other external option
   await Vue.nextTick()
   assert.equal(h.editorRef.value.computedMonacoEditorOption.language, 'python')
   assert.equal(h.editors[0].model.language, 'python')
+  h.app.unmount()
+})
+
+test('editor propagates editing, focus and blur events and inserts code at the cursor', async () => {
+  const h = harness({ modelValue: 'ab', needConfirm: false })
+  await Vue.nextTick()
+  const editor = h.editors[0], api = h.editorRef.value
+  editor.handlers.focus()
+  editor.setValue('ac')
+  editor.handlers.blur()
+  assert.deepEqual(h.events, [['focuse'], ['update:modelValue', 'ac'], ['blur'], ['change', 'ac']])
+  api.insertCodeString('X')
+  assert.equal(editor.getValue(), 'aXc')
+  editor.position = null
+  api.insertCodeString('ignored')
+  assert.equal(editor.getValue(), 'aXc')
+  editor.handlers.layout()
+  assert.equal(editor.triggers[0][1], 'editor.action.formatDocument')
+  api.fullscreenSwitch()
+  assert.equal(api.isFullScreen, true)
+  h.props.modelValue = 'external'
+  h.props.disabled = true
+  await Vue.nextTick()
+  assert.equal(editor.getValue(), 'external')
+  assert.equal(editor.options.readOnly, true)
+  h.app.unmount()
+})
+
+test('confirmed editing delays value events until commit and bidibind can ignore external replacements', async () => {
+  const h = harness({ modelValue: 'initial', needConfirm: true, bidibind: false, remindConfig: [{ language: 'sql', extra: {} }] })
+  await Vue.nextTick()
+  h.editors[0].setValue('draft')
+  h.editors[0].handlers.blur()
+  assert.deepEqual(h.events, [['blur']])
+  h.props.modelValue = 'external'
+  await Vue.nextTick()
+  assert.equal(h.editors[0].getValue(), 'draft')
+  h.editorRef.value.commit()
+  assert.deepEqual(h.events.slice(-2), [['update:modelValue', 'draft'], ['change', 'draft']])
+  assert.equal(h.providers[0].language, 'sql')
+  h.props.remindConfig = [{ language: 'python', extra: {} }]
+  await Vue.nextTick(); await Vue.nextTick()
+  assert.equal(h.providers[0].disposed, true)
+  assert.equal(h.providers.at(-1).language, 'python')
+  h.app.unmount()
+})
+
+test('editor handles empty content and unset optional theme without losing the draft', async () => {
+  const h = harness({ modelValue: 'initial' })
+  await Vue.nextTick()
+  h.editors[0].setValue('')
+  assert.equal(h.events.at(-1)[1], '')
+  h.props.monacoOptions = { theme: undefined }
+  await Vue.nextTick()
+  h.editorRef.value.refreshMonacoEditor()
+  assert.equal(h.editors.at(-1).getValue(), '')
   h.app.unmount()
 })

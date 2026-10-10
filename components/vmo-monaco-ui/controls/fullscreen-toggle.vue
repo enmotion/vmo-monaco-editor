@@ -22,7 +22,7 @@ export default defineComponent({
   },
   emits: ['update:value', 'toggle', 'commit'],
   setup(props, context) {
-    const { monacos, eachMonaco } = useVmoMonacoControl(props)
+    const { monacos } = useVmoMonacoControl(props)
     const currentValue = computed(() => {
       return typeof props.value == 'boolean'
         ? props.value
@@ -32,8 +32,10 @@ export default defineComponent({
     })
 
     function toggleFullScreen() {
+      const monaco = monacos.value[0]
+      if (!monaco) return
       const nextValue = !currentValue.value
-      monacos.value[0].fullscreenSwitch()
+      monaco.fullscreenSwitch()
       context.emit('update:value', nextValue)
       context.emit('toggle', nextValue)
       context.emit('commit', {
