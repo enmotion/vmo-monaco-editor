@@ -58,7 +58,7 @@ const greeting = 'Hello preview'
         original-value="# Original draft"
         v-model:modified-value="content"
         :need-confirm="true"
-        display-mode="modified"
+        edit-mode="modified"
         :monaco-options="{ language: 'markdown', theme, minimap: { enabled: false } }"
         style="height: 360px">
         <vmo-monaco-ui :monaco="editorRef" title="Preview demo" :config="{ reviewActions: true, commit: true }" />

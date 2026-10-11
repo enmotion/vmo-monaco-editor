@@ -1,24 +1,25 @@
 # FAQ & deployment
 
+State changes do not depend on event listeners or parent writeback. Internal actions update immediately and emit `update:*`; actual prop changes synchronize internal state. Bind with `v-model:*`, or receive `$event` with `@update:*` without writing it back. `viewMode`, `editMode`, `previewSource`, `diffViewMode`, and `fullScreen` each have their own update event; theme, font size, and language are returned together through `update:monacoOptions`.
+
+
 ## Independent view and content state
 
 Both editors expose `viewMode: 'edit' | 'preview'` through `v-model:view-mode`, `update:viewMode` and `view-mode-change`. The diff editor additionally exposes `editMode: 'original' | 'modified' | 'diff'` through `v-model:edit-mode`, `update:editMode` and `edit-mode-change`. Changing one never changes the other. `diffViewMode` only selects the comparison layout; `previewSource` only selects the preview draft. Props initialize state and real parent changes synchronize it; without writeback local changes persist.
 
 Both editors provide the same `default`, `prefix`, `preview`, and `suffix` slots. The preview payload is `{ content, language, source, theme }`; the ordinary editor's source is always `original`. Preview requires a preview slot. Removing it returns to `edit` while retaining the diff editor's `editMode`. The ordinary editor preserves its Monaco instance and draft across view changes.
 
-`displayMode`, `currentDisplayMode`, and `changeDisplayMode` are deprecated compatibility interfaces on the diff editor. The current value is a derived projection: preview when viewMode is preview, otherwise editMode. Explicit new props take priority for their own dimension. New integrations should bind the separate states.
-
 ```vue
 <VmoMonacoEditor v-model="body" v-model:view-mode="viewMode">
   <template #preview="{ content, language, source, theme }">
-    <VmoPlainTextPreview :content="content" :theme="theme" />
+    <VmoTextPreview :content="content" :theme="theme" />
   </template>
 </VmoMonacoEditor>
 <VmoMonacoDiffEditor
   v-model:original-value="body" v-model:modified-value="proposal"
   v-model:view-mode="viewMode" v-model:edit-mode="editMode">
   <template #preview="{ content, language, source, theme }">
-    <VmoPlainTextPreview :content="content" :theme="theme" />
+    <VmoTextPreview :content="content" :theme="theme" />
   </template>
 </VmoMonacoDiffEditor>
 ```

@@ -1,24 +1,25 @@
 # 常见问题与发布
 
+状态变化不依赖外部监听或回写。内部操作立即生效并 emit `update:*`；外部 props 实际改变时同步内部状态。可以使用 `v-model:*` 双向绑定，也可以通过 `@update:*` 获取 `$event` 而不回写。`viewMode`、`editMode`、`previewSource`、`diffViewMode`、`fullScreen` 各有独立更新事件；主题、字号、语言通过 `update:monacoOptions` 一起回传。
+
+
 ## 独立的视图状态与内容状态
 
 两个编辑器都提供 `viewMode: 'edit' | 'preview'`，支持 `v-model:view-mode`、`update:viewMode` 与 `view-mode-change`。差异编辑器另提供 `editMode: 'original' | 'modified' | 'diff'`，支持 `v-model:edit-mode`、`update:editMode` 与 `edit-mode-change`。改变任一状态不会改变另一状态。`diffViewMode` 仅表示比对布局，`previewSource` 仅表示预览草稿来源。props 初始化内部状态，外部实际改变时同步；外部不回写则保留内部操作结果。
 
 两个编辑器的插槽一致：`default`、`prefix`、`preview`、`suffix`。preview 参数为 `{ content, language, source, theme }`，普通编辑器的 source 固定为 original。没有 preview 插槽时无法进入预览；移除插槽会返回 edit，保留差异编辑器的 editMode。普通编辑器切换时保留 Monaco 实例和草稿。
 
-差异编辑器的 `displayMode`、`currentDisplayMode`、`changeDisplayMode` 是已弃用的兼容接口；currentDisplayMode 是派生值：viewMode 为 preview 时返回 preview，否则返回 editMode。显式的新 props 对各自维度优先。新接入请分别绑定两个状态。
-
 ```vue
 <VmoMonacoEditor v-model="body" v-model:view-mode="viewMode">
   <template #preview="{ content, language, source, theme }">
-    <VmoPlainTextPreview :content="content" :theme="theme" />
+    <VmoTextPreview :content="content" :theme="theme" />
   </template>
 </VmoMonacoEditor>
 <VmoMonacoDiffEditor
   v-model:original-value="body" v-model:modified-value="proposal"
   v-model:view-mode="viewMode" v-model:edit-mode="editMode">
   <template #preview="{ content, language, source, theme }">
-    <VmoPlainTextPreview :content="content" :theme="theme" />
+    <VmoTextPreview :content="content" :theme="theme" />
   </template>
 </VmoMonacoDiffEditor>
 ```
@@ -38,7 +39,7 @@
 
 ## 状态切换后父组件没有变化
 
-默认工具栏通过编辑器 API 改变内部状态；`VmoMonacoUi` 不转发控件交互事件。请在编辑器上使用 `v-model:display-mode`、`v-model:preview-source`、`v-model:diff-view-mode`、`v-model:monaco-options`、`v-model:diff-options` 和 `v-model:full-screen`，或监听对应 `update:*` 并读取 `$event`。普通编辑器支持 `monaco-options` 和 `full-screen`，没有 diff 视图状态。
+默认工具栏通过编辑器 API 改变内部状态；`VmoMonacoUi` 不转发控件交互事件。请在编辑器上使用 `v-model:edit-mode`、`v-model:preview-source`、`v-model:diff-view-mode`、`v-model:monaco-options`、`v-model:diff-options` 和 `v-model:full-screen`，或监听对应 `update:*` 并读取 `$event`。普通编辑器支持 `view-mode`、`monaco-options` 和 `full-screen`，不提供差异内容选择。
 
 父组件不回写时，内部切换仍然生效；外部值实际变化才覆盖内部状态。重新赋相同值不构成外部变化，等价选项对象不会重置内部选择。`needConfirm`／`bidibind` 不控制这些状态事件。独立设置控件使用 `v-model:value`，字号与语言也支持 `v-model`。详见[工具栏状态绑定](./toolbar#状态双向绑定)。
 

@@ -39,21 +39,14 @@ export default defineComponent({
     const { monacos } = useVmoMonacoControl(props)
     const previewMonacos = computed(() => monacos.value.filter((target): target is VmoMonacoEditorExpose => {
       const editor = target as Partial<VmoMonacoEditorExpose>
-      return !!editor.hasPreview && typeof editor.togglePreview == 'function'
+      return !!editor.hasPreview && typeof editor.changeViewMode == 'function'
     }))
     function applyPreview(value: boolean) {
-      previewMonacos.value.forEach(editor => {
-        if (typeof editor.changeViewMode === 'function') editor.changeViewMode(value ? 'preview' : 'edit')
-        else {
-          const legacy = editor as unknown as { currentDisplayMode: string; changeDisplayMode: (mode: 'preview') => void; togglePreview: () => void }
-          if (value && legacy.currentDisplayMode != 'preview') legacy.changeDisplayMode('preview')
-          if (!value && legacy.currentDisplayMode == 'preview') legacy.togglePreview()
-        }
-      })
+      previewMonacos.value.forEach(editor => editor.changeViewMode(value ? 'preview' : 'edit'))
     }
     const currentValue = useVmoMonacoControlValue(
       () => props.value,
-      () => previewMonacos.value[0]?.currentViewMode === 'preview' || (previewMonacos.value[0] as unknown as { currentDisplayMode?: string })?.currentDisplayMode === 'preview',
+      () => previewMonacos.value[0]?.currentViewMode === 'preview',
       applyPreview
     )
 

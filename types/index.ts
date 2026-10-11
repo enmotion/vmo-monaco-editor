@@ -1,4 +1,4 @@
-import type { VmoMonacoViewMode, VmoMonacoDiffEditMode, VmoMonacoDiffDisplayMode, VmoMonacoPreviewSource } from '../components/vmo-monaco-diff-editor/types'
+import type { VmoMonacoViewMode, VmoMonacoDiffEditMode, VmoMonacoPreviewSource } from '../components/vmo-monaco-diff-editor/types'
 import type * as Monaco from 'monaco-editor'
 
 export type VmoMonacoContext = {
@@ -45,17 +45,11 @@ export type VmoMonacoEditorExpose = {
 export type VmoMonacoDiffEditorExpose = VmoMonacoEditorExpose & {
   currentEditMode: VmoMonacoDiffEditMode
   changeEditMode: (mode: VmoMonacoDiffEditMode) => void
-  /** @deprecated Read-only projection of viewMode/editMode. */
-  currentDisplayMode: VmoMonacoDiffDisplayMode
-  togglePreview: () => void
-  hasPreview: boolean
-  currentPreviewSource: VmoMonacoPreviewSource
   changePreviewSource: (source: VmoMonacoPreviewSource) => void
   currentDiffViewMode: 'side-by-side' | 'inline'
   diffPending?: boolean
   lineChanges: Monaco.editor.ILineChange[]
   resetMonacoDiffEditorOptions: (options: Partial<Monaco.editor.IStandaloneDiffEditorConstructionOptions>) => void
-  changeDisplayMode: (mode: VmoMonacoDiffDisplayMode) => void
   changeDiffViewMode: (mode: 'side-by-side' | 'inline') => void
   acceptChange: (index: number) => void
   rejectChange: (index: number) => void

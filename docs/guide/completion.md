@@ -69,7 +69,7 @@ import type {
 import { ref } from 'vue'
 import type { VmoMonacoDiffEditorExpose } from 'vmo-monaco-editor'
 const diffRef = ref<VmoMonacoDiffEditorExpose | null>(null)
-diffRef.value?.changeDisplayMode('diff')
+diffRef.value?.changeEditMode('diff')
 ```
 
 `VmoMonacoEditorOption` 是 Monaco 普通编辑器选项的部分类型，主题限定为 `vs-dark` / `vs-light`。`VmoCodePreviewOptions` 排除由预览组件管理的 value、model、language、theme、readOnly、domReadOnly 字段。

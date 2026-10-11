@@ -1,24 +1,25 @@
 # Toolbar & controls
 
+State changes do not depend on event listeners or parent writeback. Internal actions update immediately and emit `update:*`; actual prop changes synchronize internal state. Bind with `v-model:*`, or receive `$event` with `@update:*` without writing it back. `viewMode`, `editMode`, `previewSource`, `diffViewMode`, and `fullScreen` each have their own update event; theme, font size, and language are returned together through `update:monacoOptions`.
+
+
 ## Independent view and content state
 
 Both editors expose `viewMode: 'edit' | 'preview'` through `v-model:view-mode`, `update:viewMode` and `view-mode-change`. The diff editor additionally exposes `editMode: 'original' | 'modified' | 'diff'` through `v-model:edit-mode`, `update:editMode` and `edit-mode-change`. Changing one never changes the other. `diffViewMode` only selects the comparison layout; `previewSource` only selects the preview draft. Props initialize state and real parent changes synchronize it; without writeback local changes persist.
 
 Both editors provide the same `default`, `prefix`, `preview`, and `suffix` slots. The preview payload is `{ content, language, source, theme }`; the ordinary editor's source is always `original`. Preview requires a preview slot. Removing it returns to `edit` while retaining the diff editor's `editMode`. The ordinary editor preserves its Monaco instance and draft across view changes.
 
-`displayMode`, `currentDisplayMode`, and `changeDisplayMode` are deprecated compatibility interfaces on the diff editor. The current value is a derived projection: preview when viewMode is preview, otherwise editMode. Explicit new props take priority for their own dimension. New integrations should bind the separate states.
-
 ```vue
 <VmoMonacoEditor v-model="body" v-model:view-mode="viewMode">
   <template #preview="{ content, language, source, theme }">
-    <VmoPlainTextPreview :content="content" :theme="theme" />
+    <VmoTextPreview :content="content" :theme="theme" />
   </template>
 </VmoMonacoEditor>
 <VmoMonacoDiffEditor
   v-model:original-value="body" v-model:modified-value="proposal"
   v-model:view-mode="viewMode" v-model:edit-mode="editMode">
   <template #preview="{ content, language, source, theme }">
-    <VmoPlainTextPreview :content="content" :theme="theme" />
+    <VmoTextPreview :content="content" :theme="theme" />
   </template>
 </VmoMonacoDiffEditor>
 ```
@@ -152,8 +153,8 @@ It also exposes a `review-actions` slot through `VmoMonacoUi`:
 
 ```vue
 <vmo-monaco-ui :monaco="diffRef" :config="{ reviewActions: true }">
-  <template #review-actions="{ lineChanges, acceptAllChanges, rejectAllChanges, changeDisplayMode }">
-    <button @click="changeDisplayMode('diff')">Diff</button>
+  <template #review-actions="{ lineChanges, acceptAllChanges, rejectAllChanges, changeEditMode }">
+    <button @click="changeEditMode('diff')">Diff</button>
     <button @click="rejectAllChanges()">Reject {{ lineChanges.length }}</button>
     <button @click="acceptAllChanges()">Accept</button>
   </template>
@@ -187,7 +188,7 @@ Language changes update both diff models and the preview slot's `language` value
 | Font size | `update:value`, `update:modelValue`, `commit` |
 | Language | `update:value`, `update:modelValue`, `change`, `commit` |
 | Commit button | `commit` |
-| Diff review | `accept-all`, `reject-all`, `confirm`, `accept-change`, `reject-change`, `display-mode-change`, `diff-view-mode-change` |
+| Diff review | `accept-all`, `reject-all`, `confirm`, `accept-change`, `reject-change`, `edit-mode-change`, `diff-view-mode-change` |
 
 An explicit `config` replaces the default config object. Editors with `needConfirm=true` automatically show the commit control.
 
@@ -216,14 +217,15 @@ Both review slots render only while the menu is open, retaining the trigger, pop
 | --- | --- | --- |
 | `lineChanges` | `Monaco.editor.ILineChange[]` | Current diff blocks from the first diff target; avoid stale indexes during calculation |
 | `diffPending` | `boolean` | Whether the latest diff is still calculating |
-| `currentDisplayMode` | `Mode` | Current display mode |
+| `currentEditMode` | `EditMode` | Current display mode |
+| `currentViewMode` | `ViewMode` | Current edit/preview state, independent of editMode |
 | `hasPreview` | `boolean` | Whether the first diff target provides a preview slot |
 | `acceptChange` | `(index: number) => void` | Accept a block from the current diff array |
 | `rejectChange` | `(index: number) => void` | Reject a block from the current diff array |
 | `acceptAllChanges` | `() => void` | Accept all changes |
 | `rejectAllChanges` | `() => void` | Reject all changes |
-| `changeDisplayMode` | `(mode: Mode) => void` | Switch display mode; preview applies only to preview-capable targets |
-| `changeDiffViewMode` | `(mode: ViewMode) => void` | Switch side-by-side/inline layout |
+| `changeEditMode` | `(mode: EditMode) => void` | Select original/proposal/diff without changing viewMode or previewSource |
+| `changeDiffViewMode` | `(mode: LayoutMode) => void` | Switch side-by-side/inline layout |
 | `confirm` | `() => void` | Confirm the current content |
 
 Destructure camelCase names even though template bindings use kebab-case. The slot does not supply `canReview`, `currentDiffViewMode` or `closePanel`. Disable bulk buttons using `diffPending || !lineChanges.length`; the methods themselves do not enforce this condition.

@@ -1,24 +1,25 @@
 # 工具栏与控件
 
+状态变化不依赖外部监听或回写。内部操作立即生效并 emit `update:*`；外部 props 实际改变时同步内部状态。可以使用 `v-model:*` 双向绑定，也可以通过 `@update:*` 获取 `$event` 而不回写。`viewMode`、`editMode`、`previewSource`、`diffViewMode`、`fullScreen` 各有独立更新事件；主题、字号、语言通过 `update:monacoOptions` 一起回传。
+
+
 ## 独立的视图状态与内容状态
 
 两个编辑器都提供 `viewMode: 'edit' | 'preview'`，支持 `v-model:view-mode`、`update:viewMode` 与 `view-mode-change`。差异编辑器另提供 `editMode: 'original' | 'modified' | 'diff'`，支持 `v-model:edit-mode`、`update:editMode` 与 `edit-mode-change`。改变任一状态不会改变另一状态。`diffViewMode` 仅表示比对布局，`previewSource` 仅表示预览草稿来源。props 初始化内部状态，外部实际改变时同步；外部不回写则保留内部操作结果。
 
 两个编辑器的插槽一致：`default`、`prefix`、`preview`、`suffix`。preview 参数为 `{ content, language, source, theme }`，普通编辑器的 source 固定为 original。没有 preview 插槽时无法进入预览；移除插槽会返回 edit，保留差异编辑器的 editMode。普通编辑器切换时保留 Monaco 实例和草稿。
 
-差异编辑器的 `displayMode`、`currentDisplayMode`、`changeDisplayMode` 是已弃用的兼容接口；currentDisplayMode 是派生值：viewMode 为 preview 时返回 preview，否则返回 editMode。显式的新 props 对各自维度优先。新接入请分别绑定两个状态。
-
 ```vue
 <VmoMonacoEditor v-model="body" v-model:view-mode="viewMode">
   <template #preview="{ content, language, source, theme }">
-    <VmoPlainTextPreview :content="content" :theme="theme" />
+    <VmoTextPreview :content="content" :theme="theme" />
   </template>
 </VmoMonacoEditor>
 <VmoMonacoDiffEditor
   v-model:original-value="body" v-model:modified-value="proposal"
   v-model:view-mode="viewMode" v-model:edit-mode="editMode">
   <template #preview="{ content, language, source, theme }">
-    <VmoPlainTextPreview :content="content" :theme="theme" />
+    <VmoTextPreview :content="content" :theme="theme" />
   </template>
 </VmoMonacoDiffEditor>
 ```
@@ -153,7 +154,7 @@ import { VmoMonacoUi, VmoMonacoCommitButton, VmoMonacoDiffReview,
 | 字号 | `update:value`、`update:modelValue`、`commit` |
 | 语言 | `update:value`、`update:modelValue`、`change`、`commit` |
 | 提交按钮 | `commit` |
-| 差异审阅 | `accept-all`、`reject-all`、`confirm`、`accept-change`、`reject-change`、`display-mode-change`、`diff-view-mode-change` |
+| 差异审阅 | `accept-all`、`reject-all`、`confirm`、`accept-change`、`reject-change`、`edit-mode-change`、`diff-view-mode-change` |
 
 ## 审阅菜单与插槽
 
@@ -161,8 +162,8 @@ import { VmoMonacoUi, VmoMonacoCommitButton, VmoMonacoDiffReview,
 
 ```vue
 <VmoMonacoUi :monaco="diffRef" :config="{ reviewActions: true }">
-  <template #review-actions="{ lineChanges, acceptAllChanges, rejectAllChanges, changeDisplayMode }">
-    <button @click="changeDisplayMode('diff')">对比</button>
+  <template #review-actions="{ lineChanges, acceptAllChanges, rejectAllChanges, changeEditMode }">
+    <button @click="changeEditMode('diff')">对比</button>
     <button @click="rejectAllChanges()">拒绝 {{ lineChanges.length }} 处修改</button>
     <button @click="acceptAllChanges()">全部接受</button>
   </template>
@@ -205,14 +206,15 @@ import { VmoMonacoUi, VmoMonacoCommitButton, VmoMonacoDiffReview,
 | --- | --- | --- |
 | `lineChanges` | `Monaco.editor.ILineChange[]` | 首个差异目标当前差异块；计算中不要使用旧索引 |
 | `diffPending` | `boolean` | 最新差异是否仍在计算 |
-| `currentDisplayMode` | `Mode` | 当前显示模式 |
+| `currentEditMode` | `EditMode` | 当前显示模式 |
+| `currentViewMode` | `ViewMode` | 当前编辑／预览状态，独立于 editMode |
 | `hasPreview` | `boolean` | 首个差异目标是否提供预览插槽 |
 | `acceptChange` | `(index: number) => void` | 接受当前差异数组中的单块 |
 | `rejectChange` | `(index: number) => void` | 拒绝当前差异数组中的单块 |
 | `acceptAllChanges` | `() => void` | 接受全部修改 |
 | `rejectAllChanges` | `() => void` | 拒绝全部修改 |
-| `changeDisplayMode` | `(mode: Mode) => void` | 切换显示模式；preview 仅应用于有预览能力的目标 |
-| `changeDiffViewMode` | `(mode: ViewMode) => void` | 切换并排／行内布局 |
+| `changeEditMode` | `(mode: EditMode) => void` | 只切换正文／提案／比对，保留 viewMode 和 previewSource |
+| `changeDiffViewMode` | `(mode: LayoutMode) => void` | 切换并排／行内布局 |
 | `confirm` | `() => void` | 确认当前内容 |
 
 参数以 camelCase 解构，尽管模板绑定写为 kebab-case。插槽不提供 `canReview`、`currentDiffViewMode` 或 `closePanel`；可用 `diffPending || !lineChanges.length` 判断批量按钮是否应禁用。方法本身不检查此禁用条件。

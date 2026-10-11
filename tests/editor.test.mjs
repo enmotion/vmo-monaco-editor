@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import { transpileModule, runInNewContext } from './helpers/source-runtime.mjs'
 import ts from 'typescript'
+import { createLibraryLoader } from './helpers/load-library.mjs'
 import * as Vue from 'vue'
 import * as Ramda from 'ramda'
 
@@ -40,11 +41,7 @@ function harness(initialProps = {}, behavior = {}) {
   const context = { exports: {}, require(name) {
     if (name === 'vue') return { ...Vue, onBeforeUpdate: fn => beforeUpdate.push(fn), ...(behavior.deferMount ? { onMounted: fn => mounted.push(fn) } : {}) }
     if (name === 'ramda') return Ramda
-    if (name.endsWith('/sync-monaco-options')) {
-      const helper = { exports: {}, require: () => Ramda }
-      runInNewContext(transpileModule(fs.readFileSync(new URL('../use.lib/sync-monaco-options.ts', import.meta.url), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText, helper)
-      return helper.exports
-    }
+    if (name.endsWith('/use-editor-state')) return createLibraryLoader({ vue: context.require('vue') })('use.lib/use-editor-state.ts')
     if (name.startsWith('monaco-editor')) return Monaco
     if (name === './config') return { vmoMonacoEditorDefaultOption: { language: 'typescript', theme: 'vs-dark' } }
     if (name === '../../index') return { useReminderPlugin: () => () => ({ provideCompletionItems: () => ({ suggestions: ['local'] }) }) }

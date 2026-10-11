@@ -6,19 +6,17 @@ Both editors expose `viewMode: 'edit' | 'preview'` through `v-model:view-mode`, 
 
 Both editors provide the same `default`, `prefix`, `preview`, and `suffix` slots. The preview payload is `{ content, language, source, theme }`; the ordinary editor's source is always `original`. Preview requires a preview slot. Removing it returns to `edit` while retaining the diff editor's `editMode`. The ordinary editor preserves its Monaco instance and draft across view changes.
 
-`displayMode`, `currentDisplayMode`, and `changeDisplayMode` are deprecated compatibility interfaces on the diff editor. The current value is a derived projection: preview when viewMode is preview, otherwise editMode. Explicit new props take priority for their own dimension. New integrations should bind the separate states.
-
 ```vue
 <VmoMonacoEditor v-model="body" v-model:view-mode="viewMode">
   <template #preview="{ content, language, source, theme }">
-    <VmoPlainTextPreview :content="content" :theme="theme" />
+    <VmoTextPreview :content="content" :theme="theme" />
   </template>
 </VmoMonacoEditor>
 <VmoMonacoDiffEditor
   v-model:original-value="body" v-model:modified-value="proposal"
   v-model:view-mode="viewMode" v-model:edit-mode="editMode">
   <template #preview="{ content, language, source, theme }">
-    <VmoPlainTextPreview :content="content" :theme="theme" />
+    <VmoTextPreview :content="content" :theme="theme" />
   </template>
 </VmoMonacoDiffEditor>
 ```
@@ -114,7 +112,7 @@ Run `npm run dev` and open `/preview.html` for the interactive example with cont
 theme, unstyled and custom-style controls.
 
 
-### Editor Preview Mode
+### Editor Preview EditMode
 
 ```vue
 <vmo-monaco-diff-editor
@@ -137,7 +135,7 @@ three preview components or your own renderer inside it.
 
 Without an explicit `previewSource`, entering preview from Original selects the original draft; entering from Proposal or Diff selects the proposal. An explicit source prop initializes the source and synchronizes on actual external changes. Local source changes remain effective while that prop is unchanged, including on re-entry into preview. The status row changes editMode independently; the preview source buttons change previewSource without leaving preview. Preview does not commit text or replace the two models. Removing the slot returns to edit and preserves editMode.
 
-Use `v-model:view-mode` and `v-model:preview-source` to track view and source, or listen to `@update:view-mode="handleMode($event)"` and `@update:preview-source="handleSource($event)"` without writing back. The editor retains `mode-change` and `preview-source-change` notifications. Neither `needConfirm` nor `bidibind` delays these state updates. Preview itself has no editable input; `currentReadOnly` describes the editor view's editing permission.
+Use `v-model:view-mode` and `v-model:preview-source` to track view and source, or listen to `@update:view-mode="handleMode($event)"` and `@update:preview-source="handleSource($event)"` without writing back. The editor emits `view-mode-change` and `preview-source-change` notifications independently. Neither `needConfirm` nor `bidibind` delays these state updates. Preview itself has no editable input; `currentReadOnly` describes the editor view's editing permission.
 
 The public API includes `togglePreview()`, `changeViewMode('preview')`,
 `changePreviewSource('original' | 'modified')`, `hasPreview`, and

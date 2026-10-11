@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import { transpileModule, runInNewContext } from './helpers/source-runtime.mjs'
 import ts from 'typescript'
+import { createLibraryLoader } from './helpers/load-library.mjs'
 import * as Vue from 'vue'
 import * as Ramda from 'ramda'
 
@@ -45,11 +46,7 @@ function harness(overrides = {}, slots = {}, behavior = {}) {
   const context = { exports: {}, document: { createElement: () => ({}) }, requestAnimationFrame: fn => fn(), require(name) {
     if (name === 'vue') return { ...Vue, onMounted: fn => mounted.push(fn), onBeforeUnmount: fn => unmounted.push(fn), onBeforeUpdate: fn => beforeUpdate.push(fn), getCurrentInstance: () => behavior.noInstance ? null : ({ uid: 1 }), watch(...args) { const stop = Vue.watch(...args); stops.push(stop); return stop } }
     if (name === 'ramda') return Ramda
-    if (name.endsWith('/sync-monaco-options')) {
-      const helper = { exports: {}, require: () => Ramda }
-      runInNewContext(transpileModule(fs.readFileSync(new URL('../use.lib/sync-monaco-options.ts', import.meta.url), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText, helper)
-      return helper.exports
-    }
+    if (name.endsWith('/use-editor-state')) return createLibraryLoader({ vue: context.require('vue') })('use.lib/use-editor-state.ts')
     if (name.startsWith('monaco-editor')) return Monaco
     if (name.endsWith('/config')) return { vmoMonacoEditorDefaultOption: { language: 'plaintext', theme: 'vs-dark' } }
     if (name === './review') return {
@@ -104,7 +101,7 @@ test('single-block review waits for current diff and ignores obsolete coordinate
   assert.equal(getApplied(), 2)
   assert.equal(models[0].getValue(), 'another')
   await Vue.nextTick()
-  exposed.changeDisplayMode('original')
+  exposed.changeEditMode('original')
   assert.equal(exposed.diffPending.value, true)
   updateDiff()
   assert.equal(exposed.diffPending.value, false)
@@ -113,7 +110,7 @@ test('single-block review waits for current diff and ignores obsolete coordinate
   assert.equal(exposed.diffPending.value, true)
   updateDiff()
   assert.equal(exposed.getLineChanges().length, 1)
-  exposed.changeDisplayMode('modified')
+  exposed.changeEditMode('modified')
   updateDiff()
   assert.equal(exposed.getLineChanges().length, 1)
   models[0].setValue('new proposal')
@@ -125,11 +122,11 @@ test('single-block review waits for current diff and ignores obsolete coordinate
 
 
 test('preview selects the source draft and preserves uncommitted edits across modes', async () => {
-  const h = harness({ displayMode: 'original', needConfirm: true }, { preview: () => [] })
+  const h = harness({ editMode: 'original', needConfirm: true }, { preview: () => [] })
   await Vue.nextTick()
   h.models[0].setValue('uncommitted original')
-  h.exposed.changeDisplayMode('preview')
-  assert.equal(h.exposed.currentDisplayMode.value, 'preview')
+  h.exposed.changeViewMode('preview')
+  assert.equal(h.exposed.currentViewMode.value, 'preview')
   assert.equal(h.exposed.currentPreviewSource.value, 'original')
   assert.equal(h.exposed.previewContent.value, 'uncommitted original')
   assert.equal(h.exposed.getOriginalEditor(), null)
@@ -138,8 +135,9 @@ test('preview selects the source draft and preserves uncommitted edits across mo
   h.models[1].setValue('uncommitted proposal')
   assert.equal(h.exposed.previewContent.value, 'uncommitted proposal')
   assert.equal(h.events.some(([name]) => name === 'update:originalValue' || name === 'update:modifiedValue'), false)
-  h.exposed.changeDisplayMode('diff')
-  h.exposed.changeDisplayMode('preview')
+  h.exposed.changeEditMode('diff')
+  h.exposed.changeViewMode('edit')
+  h.exposed.changeViewMode('preview')
   assert.equal(h.exposed.currentPreviewSource.value, 'modified')
   assert.equal(h.models[0].getValue(), 'uncommitted original')
   assert.equal(h.models[1].getValue(), 'uncommitted proposal')
@@ -152,16 +150,18 @@ test('preview selects the source draft and preserves uncommitted edits across mo
 })
 
 test('preview requires a slot, supports explicit source and handles slot removal', async () => {
-  const unavailable = harness({ displayMode: 'preview' })
+  const unavailable = harness({ viewMode: 'preview' })
   await Vue.nextTick()
   assert.equal(unavailable.exposed.hasPreview.value, false)
-  assert.equal(unavailable.exposed.currentDisplayMode.value, 'modified')
-  unavailable.exposed.changeDisplayMode('preview')
-  assert.equal(unavailable.exposed.currentDisplayMode.value, 'modified')
+  assert.equal(unavailable.exposed.currentViewMode.value, 'edit')
+  assert.equal(unavailable.exposed.currentEditMode.value, 'diff')
+  unavailable.exposed.changeViewMode('preview')
+  assert.equal(unavailable.exposed.currentViewMode.value, 'edit')
+  assert.equal(unavailable.exposed.currentEditMode.value, 'diff')
   unavailable.updateSlots()
   unavailable.cleanup()
   const slots = { preview: () => [] }
-  const h = harness({ displayMode: 'preview', previewSource: 'original' }, slots)
+  const h = harness({ viewMode: 'preview', previewSource: 'original' }, slots)
   await Vue.nextTick()
   assert.equal(h.exposed.previewContent.value, 'old')
   h.props.previewSource = 'modified'
@@ -171,7 +171,8 @@ test('preview requires a slot, supports explicit source and handles slot removal
   delete slots.preview
   h.updateSlots()
   assert.equal(h.exposed.hasPreview.value, false)
-  assert.equal(h.exposed.currentDisplayMode.value, 'original')
+  assert.equal(h.exposed.currentViewMode.value, 'edit')
+  assert.equal(h.exposed.currentEditMode.value, 'diff')
   await Vue.nextTick()
   h.cleanup()
 })
@@ -179,12 +180,13 @@ test('preview requires a slot, supports explicit source and handles slot removal
 
 test('preview toggle restores the previous editing mode', async () => {
   for (const mode of ['original', 'modified', 'diff']) {
-    const h = harness({ displayMode: mode }, { preview: () => [] })
+    const h = harness({ editMode: mode }, { preview: () => [] })
     await Vue.nextTick()
     h.exposed.togglePreview()
-    assert.equal(h.exposed.currentDisplayMode.value, 'preview')
+    assert.equal(h.exposed.currentViewMode.value, 'preview')
     h.exposed.togglePreview()
-    assert.equal(h.exposed.currentDisplayMode.value, mode)
+    assert.equal(h.exposed.currentViewMode.value, 'edit')
+    assert.equal(h.exposed.currentEditMode.value, mode)
     await Vue.nextTick()
     h.cleanup()
   }
@@ -240,10 +242,10 @@ test('diff supports all review actions, confirmation, focus events and both publ
   assert.equal(h.events.at(-1)[1].confirmedValue, 'new proposal')
   h.exposed.fullscreenSwitch()
   assert.equal(h.exposed.isFullScreen.value, true)
-  h.exposed.changeDisplayMode('original')
+  h.exposed.changeEditMode('original')
   assert.ok(h.exposed.getOriginalEditor())
   assert.equal(h.exposed.getModifiedEditor(), null)
-  h.exposed.changeDisplayMode('modified')
+  h.exposed.changeEditMode('modified')
   assert.ok(h.exposed.getModifiedEditor())
   assert.equal(h.exposed.getOriginalEditor(), null)
   await Vue.nextTick(); h.cleanup()
@@ -271,12 +273,12 @@ test('diff handles pending calculations, hot props, layout changes, readonly opt
   assert.equal(h.diff.options.readOnly, true)
   h.exposed.changeDiffViewMode('side-by-side')
   h.exposed.changeDiffViewMode('side-by-side')
-  h.props.displayMode = 'original'
+  h.props.editMode = 'original'
   await Vue.nextTick()
   h.props.diffViewMode = 'side-by-side'
   h.exposed.changeDiffViewMode('inline')
   await Vue.nextTick()
-  assert.equal(h.exposed.currentDisplayMode.value, 'original')
+  assert.equal(h.exposed.currentEditMode.value, 'original')
   assert.equal(h.exposed.computedMonacoEditorOption.value.lightbulb.enabled, false)
   h.props.bidibind = false
   h.props.originalValue = 'ignored'
@@ -320,10 +322,11 @@ test('diff handles empty drafts, optional configuration removal and calls after 
   h.props.previewSource = 'original'
   await Vue.nextTick()
   h.props.previewSource = undefined
-  h.exposed.changeDisplayMode('preview')
+  h.exposed.changeViewMode('preview')
   assert.equal(h.exposed.previewLanguage.value, 'plaintext')
   h.exposed.resetMonacoDiffEditorOptions({ renderIndicators: false })
-  h.exposed.changeDisplayMode('diff')
+  h.exposed.changeViewMode('edit')
+  h.exposed.changeEditMode('diff')
   await Vue.nextTick()
   assert.equal(h.diff.options.renderIndicators, false)
   h.exposed.changePreviewSource('original')
@@ -344,22 +347,22 @@ test('diff handles empty drafts, optional configuration removal and calls after 
 })
 
 test('diff editor exposes v-model events for modes, settings and fullscreen without losing internal state', async () => {
-  const h = harness({ displayMode: 'original', previewSource: 'original', fullScreen: true,
+  const h = harness({ editMode: 'original', previewSource: 'original', fullScreen: true,
     monacoOptions: { language: 'sql', theme: 'vs-light', fontSize: 12 }, diffOptions: { ignoreTrimWhitespace: true }
   }, { preview() {} })
   await Vue.nextTick()
   const e = h.exposed
   const values = name => h.events.filter(([event]) => event === name).map(([, value]) => value)
-  e.changeDisplayMode('modified')
-  assert.deepEqual(values('update:displayMode'), ['modified'])
-  assert.equal(h.props.displayMode, 'original')
+  e.changeEditMode('modified')
+  assert.deepEqual(values('update:editMode'), ['modified'])
+  assert.equal(h.props.editMode, 'original')
   h.props.disabled = true
   await Vue.nextTick()
-  assert.equal(e.currentDisplayMode.value, 'modified')
-  h.props.displayMode = 'diff'
+  assert.equal(e.currentEditMode.value, 'modified')
+  h.props.editMode = 'diff'
   await Vue.nextTick()
-  assert.equal(e.currentDisplayMode.value, 'diff')
-  e.changeDisplayMode('preview')
+  assert.equal(e.currentEditMode.value, 'diff')
+  e.changeViewMode('preview')
   e.changePreviewSource('modified')
   e.togglePreview(); e.togglePreview()
   assert.equal(e.currentPreviewSource.value, 'modified', 'stale source prop must not override local source on re-entry')
@@ -400,7 +403,8 @@ test('diff editor exposes v-model events for modes, settings and fullscreen with
   h.props.monacoOptions = { language: 'sql', theme: 'vs-light', fontSize: 12 }
   await Vue.nextTick()
   assert.equal(e.computedMonacoEditorOption.value.language, 'python')
-  e.changeDisplayMode('diff')
+  e.changeViewMode('edit')
+  e.changeEditMode('diff')
   await Vue.nextTick()
   assert.equal(h.diff.options.ignoreTrimWhitespace, false)
   h.props.diffOptions.ignoreTrimWhitespace = false
@@ -414,17 +418,17 @@ test('diff editor exposes v-model events for modes, settings and fullscreen with
 })
 
 test('readonly status follows each view and props; optional settings and repeated transitions are safe', async () => {
-  const h = harness({ displayMode: 'original', originalUri: '', modifiedUri: '' }, {}, { noInstance: true })
+  const h = harness({ editMode: 'original', originalUri: '', modifiedUri: '' }, {}, { noInstance: true })
   await Vue.nextTick()
   const e = h.exposed
   assert.equal(e.currentReadOnly.value, true)
-  e.changeDisplayMode('original')
-  e.changeDisplayMode('modified')
+  e.changeEditMode('original')
+  e.changeEditMode('modified')
   assert.equal(e.currentReadOnly.value, false)
   h.props.disabled = true
   assert.equal(e.currentReadOnly.value, true)
   h.props.disabled = false
-  e.changeDisplayMode('diff')
+  e.changeEditMode('diff')
   assert.equal(e.currentReadOnly.value, false)
   h.props.editableModified = false
   assert.equal(e.currentReadOnly.value, true)
@@ -449,34 +453,35 @@ test('readonly status follows each view and props; optional settings and repeate
 })
 
 test('diff editor v-model writeback settles without duplicate events and reflects later parent changes', async () => {
-  const h = harness({ displayMode: 'original', previewSource: 'original' }, { preview() {} }, {
+  const h = harness({ editMode: 'original', previewSource: 'original' }, { preview() {} }, {
     onEvent([name, value], props) {
-      if (name.startsWith('update:') && !['update:viewMode', 'update:editMode'].includes(name)) props[name.slice(7)] = value
+      if (name.startsWith('update:')) props[name.slice(7)] = value
     }
   })
   await Vue.nextTick()
   const e = h.exposed
-  e.changeDisplayMode('preview')
+  e.changeViewMode('preview')
   e.changePreviewSource('modified')
   e.changeDiffViewMode('inline')
   e.resetMonacoEditorOptions({ language: 'markdown', fontSize: 18, theme: 'vs-light' })
   e.resetMonacoDiffEditorOptions({ ignoreTrimWhitespace: false })
   e.fullscreenSwitch()
   await Vue.nextTick(); await Vue.nextTick()
-  for (const [name, value] of [['displayMode', 'preview'], ['previewSource', 'modified'], ['diffViewMode', 'inline'], ['fullScreen', true]]) {
+  for (const [name, value] of [['viewMode', 'preview'], ['previewSource', 'modified'], ['diffViewMode', 'inline'], ['fullScreen', true]]) {
     assert.equal(h.props[name], value)
     assert.equal(h.events.filter(([event]) => event === `update:${name}`).length, 1)
   }
   assert.equal(h.props.monacoOptions.language, 'markdown')
   assert.equal(h.props.diffOptions.ignoreTrimWhitespace, false)
-  h.props.displayMode = 'diff'
+  h.props.viewMode = 'edit'
+  h.props.editMode = 'diff'
   h.props.diffViewMode = 'side-by-side'
   h.props.previewSource = 'original'
   h.props.fullScreen = false
   h.props.monacoOptions.fontSize = 24
   h.props.diffOptions.ignoreTrimWhitespace = true
   await Vue.nextTick(); await Vue.nextTick()
-  assert.equal(e.currentDisplayMode.value, 'diff')
+  assert.equal(e.currentEditMode.value, 'diff')
   assert.equal(e.currentDiffViewMode.value, 'side-by-side')
   assert.equal(e.currentPreviewSource.value, 'original')
   assert.equal(e.isFullScreen.value, false)
@@ -486,9 +491,12 @@ test('diff editor v-model writeback settles without duplicate events and reflect
 })
 
 test('view and edit modes stay independent, honor new props and emit once with writeback', async () => {
-  const h = harness({ viewMode: 'preview', editMode: 'original', displayMode: 'diff' }, { preview() {} })
+  const h = harness({ viewMode: 'preview', editMode: 'original' }, { preview() {} })
   await Vue.nextTick()
   const e = h.exposed
+  assert.equal('displayMode' in h.props, false)
+  assert.equal('currentDisplayMode' in e, false)
+  assert.equal('changeDisplayMode' in e, false)
   assert.equal(e.currentViewMode.value, 'preview')
   assert.equal(e.currentEditMode.value, 'original')
   e.changeEditMode('diff')
@@ -498,11 +506,12 @@ test('view and edit modes stay independent, honor new props and emit once with w
   h.props.editMode = 'modified'; h.props.viewMode = 'edit'; await Vue.nextTick()
   assert.equal(e.currentEditMode.value, 'modified')
   h.props.viewMode = 'preview'; await Vue.nextTick()
-  h.props.displayMode = 'original'; await Vue.nextTick()
-  assert.equal(e.currentEditMode.value, 'modified')
+  h.props.editMode = 'original'; await Vue.nextTick()
+  assert.equal(e.currentEditMode.value, 'original')
   assert.equal(e.currentViewMode.value, 'preview')
-  h.props.editMode = undefined; h.props.viewMode = undefined; await Vue.nextTick()
-  h.props.displayMode = 'preview'; await Vue.nextTick()
+  h.props.editMode = 'diff'; h.props.viewMode = 'edit'; await Vue.nextTick()
+  assert.equal(e.currentEditMode.value, 'diff')
+  assert.equal(e.currentViewMode.value, 'edit')
   h.cleanup()
   const bound = harness({ viewMode: 'edit', editMode: 'diff' }, { preview() {} }, {
     onEvent([name, value], props) { if (name === 'update:viewMode' || name === 'update:editMode') props[name.slice(7)] = value }
@@ -514,4 +523,58 @@ test('view and edit modes stay independent, honor new props and emit once with w
   assert.equal(bound.events.filter(([n]) => n === 'update:viewMode').length, 1)
   assert.equal(bound.events.filter(([n]) => n === 'update:editMode').length, 1)
   bound.cleanup()
+})
+
+test('independent state props and emits work with or without parent writeback', async () => {
+  const states = [
+    ['viewMode', 'currentViewMode', 'changeViewMode', 'edit', 'preview', 'view-mode-change'],
+    ['editMode', 'currentEditMode', 'changeEditMode', 'diff', 'original', 'edit-mode-change'],
+    ['previewSource', 'currentPreviewSource', 'changePreviewSource', 'modified', 'original', 'preview-source-change'],
+    ['diffViewMode', 'currentDiffViewMode', 'changeDiffViewMode', 'side-by-side', 'inline', 'diff-view-mode-change'],
+    ['fullScreen', 'isFullScreen', 'changeFullScreen', false, true, 'fullscreen-change']
+  ]
+  for (const writeback of [false, true]) {
+    for (const [prop, current, method, initial, next, notification] of states) {
+      const h = harness({ [prop]: initial }, { preview() {} }, {
+        onEvent([name, value], props) { if (writeback && name === `update:${prop}`) props[prop] = value }
+      })
+      await Vue.nextTick()
+      const e = h.exposed
+      assert.equal(e[current].value, initial)
+      e[method](next)
+      assert.equal(e[current].value, next, `${prop} changes before parent render`)
+      e[method](next)
+      await Vue.nextTick()
+      assert.equal(h.props[prop], writeback ? next : initial)
+      assert.equal(h.events.filter(([name]) => name === `update:${prop}`).length, 1)
+      assert.equal(h.events.filter(([name]) => name === notification).length, 1)
+      h.props.disabled = true
+      await Vue.nextTick()
+      assert.equal(e[current].value, next, `${prop} survives an unrelated parent update`)
+      // For a parent that ignored the event, first change its old prop to the local value.
+      h.props[prop] = next
+      await Vue.nextTick()
+      h.props[prop] = initial
+      await Vue.nextTick()
+      assert.equal(e[current].value, initial, `${prop} follows a real external change`)
+      assert.equal(h.events.filter(([name]) => name === `update:${prop}`).length, 2)
+      h.cleanup()
+    }
+  }
+})
+
+test('preview, content selection and comparison layout retain independent state', async () => {
+  const h = harness({ viewMode: 'preview', editMode: 'diff', previewSource: 'modified' }, { preview() {} })
+  await Vue.nextTick()
+  h.exposed.changeEditMode('original')
+  h.exposed.changeDiffViewMode('inline')
+  assert.equal(h.exposed.currentViewMode.value, 'preview')
+  assert.equal(h.exposed.currentPreviewSource.value, 'modified')
+  assert.equal(h.exposed.previewContent.value, 'new')
+  h.exposed.changeViewMode('edit')
+  assert.equal(h.exposed.currentEditMode.value, 'original')
+  assert.equal(h.exposed.currentDiffViewMode.value, 'inline')
+  assert.notEqual(h.exposed.getOriginalEditor(), null)
+  assert.equal(h.exposed.getModifiedEditor(), null)
+  h.cleanup()
 })

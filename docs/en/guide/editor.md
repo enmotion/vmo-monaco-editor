@@ -1,24 +1,25 @@
 # Normal editor
 
+State changes do not depend on event listeners or parent writeback. Internal actions update immediately and emit `update:*`; actual prop changes synchronize internal state. Bind with `v-model:*`, or receive `$event` with `@update:*` without writing it back. `viewMode`, `editMode`, `previewSource`, `diffViewMode`, and `fullScreen` each have their own update event; theme, font size, and language are returned together through `update:monacoOptions`.
+
+
 ## Independent view and content state
 
 Both editors expose `viewMode: 'edit' | 'preview'` through `v-model:view-mode`, `update:viewMode` and `view-mode-change`. The diff editor additionally exposes `editMode: 'original' | 'modified' | 'diff'` through `v-model:edit-mode`, `update:editMode` and `edit-mode-change`. Changing one never changes the other. `diffViewMode` only selects the comparison layout; `previewSource` only selects the preview draft. Props initialize state and real parent changes synchronize it; without writeback local changes persist.
 
 Both editors provide the same `default`, `prefix`, `preview`, and `suffix` slots. The preview payload is `{ content, language, source, theme }`; the ordinary editor's source is always `original`. Preview requires a preview slot. Removing it returns to `edit` while retaining the diff editor's `editMode`. The ordinary editor preserves its Monaco instance and draft across view changes.
 
-`displayMode`, `currentDisplayMode`, and `changeDisplayMode` are deprecated compatibility interfaces on the diff editor. The current value is a derived projection: preview when viewMode is preview, otherwise editMode. Explicit new props take priority for their own dimension. New integrations should bind the separate states.
-
 ```vue
 <VmoMonacoEditor v-model="body" v-model:view-mode="viewMode">
   <template #preview="{ content, language, source, theme }">
-    <VmoPlainTextPreview :content="content" :theme="theme" />
+    <VmoTextPreview :content="content" :theme="theme" />
   </template>
 </VmoMonacoEditor>
 <VmoMonacoDiffEditor
   v-model:original-value="body" v-model:modified-value="proposal"
   v-model:view-mode="viewMode" v-model:edit-mode="editMode">
   <template #preview="{ content, language, source, theme }">
-    <VmoPlainTextPreview :content="content" :theme="theme" />
+    <VmoTextPreview :content="content" :theme="theme" />
   </template>
 </VmoMonacoDiffEditor>
 ```
@@ -98,6 +99,7 @@ Props initialize local state. Internal actions take effect immediately and emit 
 
 | Prop | Type | Default | Description |
 | --- | --- | --- | --- |
+| `viewMode` | `'edit' \| 'preview'` | `'edit'` | Independent edit/preview state; supports `v-model:view-mode`. |
 | `modelValue` | `string` | `'//code content gose here...'` | Editor content. Supports `v-model`. |
 | `prefix` | `string` | `'(()=>{})'` | Extra content displayed above the Monaco editor. It is not part of the model. |
 | `suffix` | `string` | `'};'` | Extra content displayed below the Monaco editor. It is not part of the model. |
@@ -113,6 +115,7 @@ Props initialize local state. Internal actions take effect immediately and emit 
 
 | Event | Payload | Description |
 | --- | --- | --- |
+| `update:viewMode` / `view-mode-change` | edit / preview | Actual view state changes. |
 | `update:modelValue` | `string` | Emitted on content change when `needConfirm=false`, or by `commit()`. |
 | `update:monacoOptions` / `options-change` | `VmoMonacoEditorOption` | Controls or API change options; independent snapshots. |
 | `update:fullScreen` / `fullscreen-change` | `boolean` | Fullscreen state actually changes. |
@@ -126,6 +129,8 @@ Props initialize local state. Internal actions take effect immediately and emit 
 editorRef.value.insertCodeString(code)
 editorRef.value.changeFullScreen(true)
 editorRef.value.fullscreenSwitch()
+editorRef.value.changeViewMode('preview') // Requires a preview slot
+editorRef.value.togglePreview()
 editorRef.value.resetMonacoEditorOptions(options)
 editorRef.value.refreshMonacoEditor()
 editorRef.value.changeLanguage(language)
@@ -159,6 +164,7 @@ Use `ref<InstanceType<typeof VmoMonacoEditor> | null>(null)` for the complete co
 | `default` | None | Above the editor, typically a toolbar; no content when omitted |
 | `prefix` | `{ option: VmoMonacoEditorOption }` | Replaces extra content above the editor; otherwise renders the prefix prop through v-html. Present when the slot exists or prefix is nonempty |
 | `suffix` | `{ option: VmoMonacoEditorOption }` | Replaces extra content below the editor; otherwise renders the suffix prop through v-html. Present when the slot exists or suffix is nonempty |
+| `preview` | `{ content: string; language: string; source: 'original'; theme: Theme }` | Current internal draft; rendered only in preview mode, without a built-in renderer. |
 
 `option` contains current options merged with defaults and follows state changes. Prefix/suffix content is outside the Monaco model. These slots do not receive a draft or submission methods. Use Vue interpolation for plain text and trusted content for HTML props.
 
@@ -169,3 +175,15 @@ Use `ref<InstanceType<typeof VmoMonacoEditor> | null>(null)` for the complete co
   <template #suffix="{ option }"><span>{{ option.fontSize }} px</span></template>
 </VmoMonacoEditor>
 ```
+
+
+## Shared options and fullscreen behavior
+
+The ordinary and diff editors share options and fullscreen state management. Existing public props, events, methods, and slots retain their contracts:
+
+- `resetMonacoEditorOptions()` deeply merges internal options. The diff editor's `resetMonacoDiffEditorOptions()` follows the same rules for diff options. An unchanged result does not emit another options event.
+- Options props synchronize actual external changes by top-level field, comparing nested objects as whole fields. Equivalent objects preserve local choices; removing an external field removes the corresponding internal override. External options synchronization does not emit options writeback events.
+- Internal options changes update state before emitting `update:monacoOptions` and then `options-change` (or `update:diffOptions` and `diff-options-change` for diff options). Each event receives an independent snapshot: mutating one payload cannot change internal options or the other payload. Snapshots contain internal overrides; read `computedMonacoEditorOption` for effective options merged with defaults.
+- `changeFullScreen(value)` and `fullscreenSwitch()` update local state before emitting `update:fullScreen` and `fullscreen-change`. Actual external fullScreen changes use the same synchronization path. Setting the same value, including v-model writeback, does not duplicate events.
+
+Local actions remain effective without parent writeback. `needConfirm` and `bidibind` govern text submission/synchronization only and do not change these rules.

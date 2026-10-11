@@ -1,24 +1,25 @@
 # 普通编辑器
 
+状态变化不依赖外部监听或回写。内部操作立即生效并 emit `update:*`；外部 props 实际改变时同步内部状态。可以使用 `v-model:*` 双向绑定，也可以通过 `@update:*` 获取 `$event` 而不回写。`viewMode`、`editMode`、`previewSource`、`diffViewMode`、`fullScreen` 各有独立更新事件；主题、字号、语言通过 `update:monacoOptions` 一起回传。
+
+
 ## 独立的视图状态与内容状态
 
 两个编辑器都提供 `viewMode: 'edit' | 'preview'`，支持 `v-model:view-mode`、`update:viewMode` 与 `view-mode-change`。差异编辑器另提供 `editMode: 'original' | 'modified' | 'diff'`，支持 `v-model:edit-mode`、`update:editMode` 与 `edit-mode-change`。改变任一状态不会改变另一状态。`diffViewMode` 仅表示比对布局，`previewSource` 仅表示预览草稿来源。props 初始化内部状态，外部实际改变时同步；外部不回写则保留内部操作结果。
 
 两个编辑器的插槽一致：`default`、`prefix`、`preview`、`suffix`。preview 参数为 `{ content, language, source, theme }`，普通编辑器的 source 固定为 original。没有 preview 插槽时无法进入预览；移除插槽会返回 edit，保留差异编辑器的 editMode。普通编辑器切换时保留 Monaco 实例和草稿。
 
-差异编辑器的 `displayMode`、`currentDisplayMode`、`changeDisplayMode` 是已弃用的兼容接口；currentDisplayMode 是派生值：viewMode 为 preview 时返回 preview，否则返回 editMode。显式的新 props 对各自维度优先。新接入请分别绑定两个状态。
-
 ```vue
 <VmoMonacoEditor v-model="body" v-model:view-mode="viewMode">
   <template #preview="{ content, language, source, theme }">
-    <VmoPlainTextPreview :content="content" :theme="theme" />
+    <VmoTextPreview :content="content" :theme="theme" />
   </template>
 </VmoMonacoEditor>
 <VmoMonacoDiffEditor
   v-model:original-value="body" v-model:modified-value="proposal"
   v-model:view-mode="viewMode" v-model:edit-mode="editMode">
   <template #preview="{ content, language, source, theme }">
-    <VmoPlainTextPreview :content="content" :theme="theme" />
+    <VmoTextPreview :content="content" :theme="theme" />
   </template>
 </VmoMonacoDiffEditor>
 ```
@@ -85,10 +86,23 @@ const fullScreen = ref(false)
 
 props 初始化内部状态；内部操作立即生效并 emit 更新，即使父组件不回写也会保留。外部值真正变化才覆盖内部状态，等价配置对象的重渲染不会重置工具栏选择。配置按顶层字段同步，嵌套对象作为一个字段；删除外部字段会删除内部对应覆盖值。`needConfirm` 和 `bidibind` 只控制文本提交／同步，不会延迟或阻止设置与全屏状态更新。
 
+
+## 配置与全屏状态的共同约定
+
+普通编辑器与差异编辑器使用相同的配置和全屏状态管理逻辑，公开 props、事件、方法及插槽保持一致的既有契约：
+
+- `resetMonacoEditorOptions()` 深度合并内部配置；差异编辑器的 `resetMonacoDiffEditorOptions()` 对 diff 配置采用同样规则。实际结果不变时不重复发出配置事件。
+- 配置 props 按外部顶层字段的实际变化同步；嵌套对象作为完整字段比较。等价对象不会覆盖内部选择，删除外部字段会移除对应内部覆盖值。外部配置同步不发出配置回写事件。
+- 内部配置变化先更新状态，再依次发出 `update:monacoOptions` 和 `options-change`（diff 配置对应 `update:diffOptions` 和 `diff-options-change`）。每个事件得到独立快照；监听器修改一个事件参数不会改变内部配置或另一个事件参数。快照是内部配置覆盖值，合并默认值后的实际配置从实例的 `computedMonacoEditorOption` 读取。
+- `changeFullScreen(value)` 与 `fullscreenSwitch()` 先更新内部状态，再发出 `update:fullScreen` 与 `fullscreen-change`。真实外部 fullScreen 变化也通过同一入口同步；相同值和 v-model 回写不会重复发出事件。
+
+父组件不回写时仍保留内部操作结果。`needConfirm` 与 `bidibind` 只影响文本提交／同步，不改变上述规则。
+
 ## Props
 
 | 属性 | 类型 | 默认值 | 说明 |
 | --- | --- | --- | --- |
+| `viewMode` | `'edit' \| 'preview'` | `'edit'` | 独立编辑／预览状态，支持 `v-model:view-mode` |
 | `modelValue` | `string` | `'//code content gose here...'` | 编辑内容，支持 `v-model` |
 | `prefix` | `string` | `'(()=>{})'` | 编辑器上方展示内容，不进入 model |
 | `suffix` | `string` | `'};'` | 编辑器下方展示内容，不进入 model |
@@ -106,6 +120,7 @@ props 初始化内部状态；内部操作立即生效并 emit 更新，即使�
 
 | 事件 | 参数 | 触发时机 |
 | --- | --- | --- |
+| `update:viewMode` / `view-mode-change` | edit / preview | 编辑／预览状态实际变化 |
 | `update:modelValue` | `string` | 实时编辑或 `commit()` |
 | `update:monacoOptions` / `options-change` | `VmoMonacoEditorOption` | 控件或 API 实际改变配置，返回独立配置快照 |
 | `update:fullScreen` / `fullscreen-change` | `boolean` | 全屏状态实际变化 |
@@ -121,6 +136,8 @@ editorRef.value.resetMonacoEditorOptions({ fontSize: 16 })
 editorRef.value.changeLanguage('sql')
 editorRef.value.changeFullScreen(true)
 editorRef.value.fullscreenSwitch()
+editorRef.value.changeViewMode('preview') // 需要 preview 插槽
+editorRef.value.togglePreview()
 editorRef.value.refreshMonacoEditor() // 保留内部文本，重建编辑器
 editorRef.value.commit()
 ```
@@ -134,6 +151,7 @@ editorRef.value.commit()
 | `default` | 无 | 位于编辑器上方，可放工具栏；未提供时不渲染此区域 |
 | `prefix` | `{ option: VmoMonacoEditorOption }` | 替换上方附加内容；未提供插槽时用 `v-html` 渲染 prefix prop。插槽存在或 prefix 非空时渲染 |
 | `suffix` | `{ option: VmoMonacoEditorOption }` | 替换下方附加内容；未提供插槽时用 `v-html` 渲染 suffix prop。插槽存在或 suffix 非空时渲染 |
+| `preview` | `{ content: string; language: string; source: 'original'; theme: Theme }` | 当前内部草稿，仅在 preview 状态渲染，无内置渲染器。 |
 
 `option` 是合并默认值后的当前配置，随状态更新。prefix／suffix 不是 Monaco model 内容；插槽不会得到草稿或提交方法。普通文本可用 Vue 插值，HTML prop 只应传入可信内容。
 

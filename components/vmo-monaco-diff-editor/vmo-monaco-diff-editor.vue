@@ -16,8 +16,8 @@
           <span v-html="prefix" class="extra-code"></span>
         </div>
       </slot>
-      <div v-show="currentDisplayMode != 'preview'" ref="MonacoEditorRef" class="ide-container"></div>
-      <div v-if="currentDisplayMode == 'preview'" class="vmo-preview-container">
+      <div v-show="currentViewMode == 'edit'" ref="MonacoEditorRef" class="ide-container"></div>
+      <div v-if="currentViewMode == 'preview'" class="vmo-preview-container">
         <div v-if="!!modifiedInnerValue" class="vmo-preview-source" role="group" aria-label="Preview source">
           <button type="button" :aria-pressed="currentPreviewSource == 'original'" @click="changePreviewSource('original')">正文</button>
           <button type="button" :aria-pressed="currentPreviewSource == 'modified'" @click="changePreviewSource('modified')">提案</button>
@@ -85,13 +85,13 @@
 
 <script lang="ts">
 import { defineComponent, ref, shallowRef, onMounted, onBeforeUnmount, onBeforeUpdate, watch, computed, nextTick, getCurrentInstance } from 'vue'
-import { mergeDeepRight, clone, equals, isNil } from 'ramda'
+import { mergeDeepRight, isNil } from 'ramda'
 import 'monaco-editor/esm/vs/basic-languages/css/css.contribution'
 import 'monaco-editor/esm/vs/basic-languages/xml/xml.contribution'
 import 'monaco-editor/esm/vs/basic-languages/javascript/javascript.contribution'
 import type { PropType } from 'vue'
 import * as Monaco from 'monaco-editor'
-import { syncMonacoOptions } from '../../use.lib/sync-monaco-options'
+import { useEditorOptions, useEditorFullscreen } from '../../use.lib/use-editor-state'
 import { vmoMonacoEditorDefaultOption } from '../vmo-monaco-editor/config'
 import {
   applyLineChange as applyReviewLineChange,
@@ -105,7 +105,6 @@ import type {
   VmoMonacoDiffConfirmPayload,
   VmoMonacoViewMode,
   VmoMonacoDiffEditMode,
-  VmoMonacoDiffDisplayMode,
   VmoMonacoDiffEditor,
   VmoMonacoDiffReviewActionPayload,
   VmoMonacoDiffViewMode,
@@ -124,7 +123,6 @@ export type {
   VmoMonacoDiffConfirmPayload,
   VmoMonacoViewMode,
   VmoMonacoDiffEditMode,
-  VmoMonacoDiffDisplayMode,
   VmoMonacoDiffReviewActionPayload,
   VmoMonacoDiffViewMode
 } from './types'
@@ -151,15 +149,10 @@ export default defineComponent({
     },
     viewMode: {
       type: String as PropType<VmoMonacoViewMode>,
-      default: undefined
+      default: 'edit'
     },
     editMode: {
       type: String as PropType<VmoMonacoDiffEditMode>,
-      default: undefined
-    },
-    // Compatibility input only; actual state is split into viewMode and editMode.
-    displayMode: {
-      type: String as PropType<VmoMonacoDiffDisplayMode>,
       default: 'diff'
     },
     previewSource: {
@@ -226,7 +219,6 @@ export default defineComponent({
     'view-mode-change',
     'update:editMode',
     'edit-mode-change',
-    'update:displayMode',
     'update:previewSource',
     'update:diffViewMode',
     'diff-view-mode-change',
@@ -247,13 +239,14 @@ export default defineComponent({
     'focuse',
     'blur',
     'preview-source-change',
-    'mode-change'
   ],
   setup(props, context) {
     const componentUid = getCurrentInstance()?.uid || Math.random().toString(36).slice(2)
     // ===== 容器状态 =====
     // 这些状态控制组件外壳，与 Monaco model 内容无关。
-    const isFullScreen = ref(props.fullScreen)
+    const { isFullScreen, changeFullScreen, fullscreenSwitch } = useEditorFullscreen(
+      () => props.fullScreen, context.emit
+    )
     const MonacoEditorRef = shallowRef(null as any)
     const monacoEditorInstance = shallowRef(null as VmoMonacoAnyDiffEditor | null)
 
@@ -264,16 +257,11 @@ export default defineComponent({
     const modifiedModel = shallowRef(null as Monaco.editor.ITextModel | null)
 
     // ===== 视图模式 =====
-    // displayMode 控制只看确认稿、只看候选稿、或进入 diff 审阅。
+    // viewMode 控制编辑/预览，editMode 独立选择确认稿/候选稿/diff。
     // diffViewMode 只影响 diff 模式下的并排/混合渲染。
     const hasPreview = ref(!!context.slots?.preview)
-    const currentEditMode = ref<VmoMonacoDiffEditMode>(props.editMode ??
-      (props.displayMode === 'preview' ? props.previewSource || 'modified' : props.displayMode))
-    const currentViewMode = ref<VmoMonacoViewMode>(
-      (props.viewMode ?? (props.displayMode === 'preview' ? 'preview' : 'edit')) === 'preview' && hasPreview.value ? 'preview' : 'edit')
-    // Read-only legacy projection, never an independent state source.
-    const currentDisplayMode = computed<VmoMonacoDiffDisplayMode>(() =>
-      currentViewMode.value === 'preview' ? 'preview' : currentEditMode.value)
+    const currentEditMode = ref<VmoMonacoDiffEditMode>(props.editMode)
+    const currentViewMode = ref<VmoMonacoViewMode>(props.viewMode === 'preview' && hasPreview.value ? 'preview' : 'edit')
     const currentPreviewSource = ref<VmoMonacoPreviewSource>(props.previewSource || (currentEditMode.value == 'original' ? 'original' : 'modified'))
     const currentDiffViewMode = ref(props.diffViewMode)
 
@@ -299,24 +287,24 @@ export default defineComponent({
 
     // ===== Monaco 配置 =====
     // 普通配置用于单栏 editor 和 diff editor 内部两侧 editor；diff 配置只用于 diff editor。
-    const monacoEditorOptions = ref(
-      {} as Partial<Monaco.editor.IStandaloneEditorConstructionOptions & { theme: 'vs-dark' | 'vs-light' }>
+    const { options: monacoEditorOptions, reset: resetMonacoEditorOptions } = useEditorOptions(
+      () => props.monacoOptions, context.emit, 'monacoOptions', 'options-change'
     )
-    const diffEditorOptions = ref({} as Partial<Monaco.editor.IStandaloneDiffEditorConstructionOptions>)
+    const { options: diffEditorOptions, reset: resetMonacoDiffEditorOptions } = useEditorOptions(
+      () => props.diffOptions, context.emit, 'diffOptions', 'diff-options-change'
+    )
 
     // 最终普通 editor 配置；用于 original/modified 单独显示模式，也作为 diff editor 的基础配置来源。
     const computedMonacoEditorOption = computed<Partial<Monaco.editor.IStandaloneEditorConstructionOptions & { theme: 'vs-dark' | 'vs-light' }>>(() => {
-      monacoEditorOptions.value
       return mergeDeepRight(
         vmoMonacoEditorDefaultOption,
         mergeDeepRight(monacoEditorOptions.value, { lightbulb: { enabled: false } })
       )
     })
-    const currentReadOnly = computed(() => currentDisplayMode.value === 'diff'
+    const currentReadOnly = computed(() => currentEditMode.value === 'diff'
       ? props.disabled || (!props.editableOriginal && !props.editableModified)
       : getNormalEditorReadOnly())
     const computedDiffEditorOption = computed(() => {
-      diffEditorOptions.value
       return mergeDeepRight(diffEditorOptions.value, {
         lightbulb: {
           enabled: false
@@ -327,34 +315,12 @@ export default defineComponent({
       }) as Partial<Monaco.editor.IStandaloneDiffEditorConstructionOptions>
     })
 
-    let previousMonacoOptions: typeof props.monacoOptions | undefined
-    watch(
-      () => props.monacoOptions,
-      n => {
-        if (n) {
-          monacoEditorOptions.value = syncMonacoOptions(monacoEditorOptions.value, n, previousMonacoOptions)
-          previousMonacoOptions = clone(n)
-        }
-      },
-      { immediate: true, deep: true }
-    )
     watch(() => computedMonacoEditorOption.value.language, language => {
       if (!language) return
       for (const model of [originalModel.value, modifiedModel.value]) {
         if (model && model.getLanguageId() != language) Monaco.editor.setModelLanguage(model, language)
       }
     })
-    let previousDiffOptions: typeof props.diffOptions | undefined
-    watch(
-      () => props.diffOptions,
-      n => {
-        if (n) {
-          diffEditorOptions.value = syncMonacoOptions(diffEditorOptions.value, n, previousDiffOptions)
-          previousDiffOptions = clone(n)
-        }
-      },
-      { immediate: true, deep: true }
-    )
     watch(
       () => computedMonacoEditorOption.value.theme,
       theme => {
@@ -371,16 +337,8 @@ export default defineComponent({
       },
       { deep: true }
     )
-    watch(() => props.viewMode, mode => { if (mode !== undefined) changeViewMode(mode) })
-    watch(() => props.editMode, mode => { if (mode !== undefined) changeEditMode(mode) })
-    watch(
-      () => props.displayMode,
-      mode => {
-        // New props own their respective dimensions when both interfaces are supplied.
-        if (props.editMode === undefined && mode !== 'preview') changeEditMode(mode)
-        if (props.viewMode === undefined) changeViewMode(mode === 'preview' ? 'preview' : 'edit')
-      }
-    )
+    watch(() => props.viewMode, changeViewMode)
+    watch(() => props.editMode, changeEditMode)
     watch(
       () => props.diffViewMode,
       mode => {
@@ -412,7 +370,7 @@ export default defineComponent({
       if (!hasPreview.value && currentViewMode.value == 'preview') changeViewMode('edit')
     })
 
-    // 初始化时先创建两个稳定 model，再根据 displayMode 创建对应 editor view。
+    // 初始化时先创建两个稳定 model，再根据 viewMode 和 editMode 创建对应 editor view。
     // 后续切模式只销毁/重建 editor view，不销毁 model，避免丢失用户编辑内容。
     onMounted(() => {
       initModels()
@@ -453,18 +411,18 @@ export default defineComponent({
       ]
     }
 
-    // 根据当前 displayMode 创建普通 editor 或 diff editor。
+    // 根据独立的 viewMode 和 editMode 创建普通 editor 或 diff editor。
     // 普通模式绑定单个 model；diff 模式绑定 original + modified 两个 model。
     function refreshMonacoEditor() {
       disposeEditor()
       if (!MonacoEditorRef.value || !originalModel.value || !modifiedModel.value) return
 
-      if (currentDisplayMode.value == 'preview') {
+      if (currentViewMode.value == 'preview') {
         createBackgroundDiffEditor()
         return
       }
 
-      if (currentDisplayMode.value == 'diff') {
+      if (currentEditMode.value == 'diff') {
         const instance = Monaco.editor.createDiffEditor(
           MonacoEditorRef.value,
           mergeDeepRight(computedMonacoEditorOption.value, computedDiffEditorOption.value)
@@ -483,7 +441,7 @@ export default defineComponent({
         return
       }
 
-      const targetModel = currentDisplayMode.value == 'original' ? originalModel.value : modifiedModel.value
+      const targetModel = currentEditMode.value == 'original' ? originalModel.value : modifiedModel.value
       const instance = Monaco.editor.create(
         MonacoEditorRef.value,
         mergeDeepRight(computedMonacoEditorOption.value as Monaco.editor.IStandaloneEditorConstructionOptions, {
@@ -611,7 +569,7 @@ export default defineComponent({
     }
 
     function getNormalEditorReadOnly() {
-      return props.disabled || (currentDisplayMode.value == 'original' ? !props.editableOriginal : !props.editableModified)
+      return props.disabled || (currentEditMode.value == 'original' ? !props.editableOriginal : !props.editableModified)
     }
 
     function setModelValue(model: Monaco.editor.ITextModel | null, value: string) {
@@ -702,33 +660,6 @@ export default defineComponent({
         modifiedAcceptMap: {},
         modifiedRejectMap: {}
       }
-    }
-
-    function resetMonacoEditorOptions(options: Partial<Monaco.editor.IStandaloneEditorConstructionOptions>) {
-      const next = mergeDeepRight(monacoEditorOptions.value, options) as typeof monacoEditorOptions.value
-      if (equals(next, monacoEditorOptions.value)) return
-      monacoEditorOptions.value = next
-      context.emit('update:monacoOptions', clone(next))
-      context.emit('options-change', clone(next))
-    }
-
-    function resetMonacoDiffEditorOptions(options: Partial<Monaco.editor.IStandaloneDiffEditorConstructionOptions>) {
-      const next = mergeDeepRight(diffEditorOptions.value, options)
-      if (equals(next, diffEditorOptions.value)) return
-      diffEditorOptions.value = next
-      context.emit('update:diffOptions', clone(next))
-      context.emit('diff-options-change', clone(next))
-    }
-
-    watch(() => props.fullScreen, value => changeFullScreen(value))
-    function changeFullScreen(value: boolean) {
-      if (value === isFullScreen.value) return
-      isFullScreen.value = value
-      context.emit('update:fullScreen', value)
-      context.emit('fullscreen-change', value)
-    }
-    function fullscreenSwitch() {
-      changeFullScreen(!isFullScreen.value)
     }
 
     function commit() {
@@ -823,16 +754,9 @@ export default defineComponent({
       }
     }
 
-    function emitLegacyMode(previous: VmoMonacoDiffDisplayMode) {
-      if (previous === currentDisplayMode.value) return
-      context.emit('update:displayMode', currentDisplayMode.value)
-      context.emit('mode-change', currentDisplayMode.value)
-    }
-
     function changeViewMode(mode: VmoMonacoViewMode) {
       if (mode === 'preview' && !hasPreview.value) return
       if (mode === currentViewMode.value) return
-      const previous = currentDisplayMode.value
       if (mode === 'preview' && props.previewSource === undefined) {
         changePreviewSource(currentEditMode.value === 'original' ? 'original' : 'modified')
       }
@@ -840,26 +764,14 @@ export default defineComponent({
       refreshMonacoEditor()
       context.emit('update:viewMode', mode)
       context.emit('view-mode-change', mode)
-      emitLegacyMode(previous)
     }
 
     function changeEditMode(mode: VmoMonacoDiffEditMode) {
       if (mode === currentEditMode.value) return
-      const previous = currentDisplayMode.value
       currentEditMode.value = mode
       if (currentViewMode.value === 'edit') refreshMonacoEditor()
       context.emit('update:editMode', mode)
       context.emit('edit-mode-change', mode)
-      emitLegacyMode(previous)
-    }
-
-    /** @deprecated Compatibility command; edit values also return to edit view. */
-    function changeDisplayMode(mode: VmoMonacoDiffDisplayMode) {
-      if (mode === 'preview') changeViewMode('preview')
-      else {
-        changeEditMode(mode)
-        changeViewMode('edit')
-      }
     }
 
     function togglePreview() {
@@ -871,7 +783,7 @@ export default defineComponent({
         currentDiffViewMode.value = mode
         context.emit('update:diffViewMode', mode)
         context.emit('diff-view-mode-change', mode)
-        if (currentDisplayMode.value == 'diff') {
+        if (currentViewMode.value === 'edit' && currentEditMode.value == 'diff') {
           refreshMonacoEditor()
         }
       }
@@ -879,12 +791,12 @@ export default defineComponent({
 
     function getOriginalEditor() {
       const instance = monacoEditorInstance.value
-      return !!instance && isDiffEditor(instance) ? instance.getOriginalEditor() : currentDisplayMode.value == 'original' ? instance : null
+      return !!instance && isDiffEditor(instance) ? instance.getOriginalEditor() : currentEditMode.value == 'original' ? instance : null
     }
 
     function getModifiedEditor() {
       const instance = monacoEditorInstance.value
-      return !!instance && isDiffEditor(instance) ? instance.getModifiedEditor() : currentDisplayMode.value == 'modified' ? instance : null
+      return !!instance && isDiffEditor(instance) ? instance.getModifiedEditor() : currentEditMode.value == 'modified' ? instance : null
     }
 
     function getDiffEditor() {
@@ -906,7 +818,6 @@ export default defineComponent({
       mergeDeepRight,
       currentViewMode,
       currentEditMode,
-      currentDisplayMode,
       currentReadOnly,
       hasPreview,
       currentPreviewSource,
@@ -932,7 +843,6 @@ export default defineComponent({
       changeLanguage,
       changeViewMode,
       changeEditMode,
-      changeDisplayMode,
       togglePreview,
       changeDiffViewMode,
       getOriginalEditor,

@@ -128,7 +128,8 @@ test('review control dispatches actions only to diff targets and removes outside
   const component = load('components/vmo-monaco-ui/controls/diff-review.vue').default
   const props = { value: 'review', config: true }
   const control = component.setup(props, { emit: (...event) => events.push(event) })
-  assert.equal(control.currentDisplayMode.value, 'diff')
+  assert.equal(control.currentEditMode.value, 'diff')
+  assert.equal(control.currentViewMode.value, 'edit')
   assert.equal(control.currentDiffViewMode.value, 'side-by-side')
   assert.equal(control.canReview.value, false)
   assert.equal(control.hasPreview.value, false)
@@ -136,7 +137,7 @@ test('review control dispatches actions only to diff targets and removes outside
     hasPreview, getLineChanges: () => [{}], acceptAllChanges: () => calls.push('accept-all'),
     rejectAllChanges: () => calls.push('reject-all'), confirm: () => calls.push('confirm'),
     acceptChange: index => calls.push(['accept', index]), rejectChange: index => calls.push(['reject', index]),
-    changeDisplayMode: mode => calls.push(['display', mode]), changeDiffViewMode: mode => calls.push(['layout', mode])
+    changeEditMode: mode => calls.push(['display', mode]), changeDiffViewMode: mode => calls.push(['layout', mode])
   })
   injected.value = [make(true), make(false), target(), null]
   assert.equal(control.lineChanges.value.length, 1)
@@ -144,9 +145,9 @@ test('review control dispatches actions only to diff targets and removes outside
   assert.equal(control.hasPreview.value, true)
   control.acceptAllChanges(); control.rejectAllChanges(); control.confirm()
   control.acceptChange(2); control.rejectChange(3)
-  control.changeDisplayMode('original'); control.changeDisplayMode('preview'); control.changeDiffViewMode('inline')
+  control.changeEditMode('original'); control.changeEditMode('diff'); control.changeDiffViewMode('inline')
   assert.equal(calls.filter(call => call === 'accept-all').length, 2)
-  assert.equal(calls.filter(call => Array.isArray(call) && call[0] === 'display' && call[1] === 'preview').length, 1)
+  assert.equal(calls.filter(call => Array.isArray(call) && call[0] === 'display' && call[1] === 'diff').length, 2)
   assert.equal(events.at(-1)[1].monacoCount, 2)
   assert.equal(events.find(([name]) => name === 'accept-change')[1].index, 2)
   control.togglePanel()
@@ -252,11 +253,13 @@ test('fullscreen props and internal actions set the actual target state', () => 
 })
 
 test('review content action preserves preview on split-mode targets', () => {
-  const target = { acceptAllChanges() {}, getLineChanges: () => [], currentViewMode: 'preview', currentDisplayMode: 'preview',
-    changeEditMode(mode) { this.currentEditMode = mode }, changeDisplayMode(mode) { this.currentDisplayMode = mode } }
+  const target = { acceptAllChanges() {}, getLineChanges: () => [], currentViewMode: 'preview', currentEditMode: 'diff',
+    changeEditMode(mode) { this.currentEditMode = mode } }
   const load = createLibraryLoader({ vue: { ...Vue, inject: () => Vue.ref(target) } })
   const control = load('components/vmo-monaco-ui/controls/diff-review.vue').default.setup({}, { emit() {} })
-  control.changeDisplayMode('original')
+  control.changeEditMode('original')
   assert.equal(target.currentEditMode, 'original')
   assert.equal(target.currentViewMode, 'preview')
+  assert.equal(control.currentViewMode.value, 'preview')
+  assert.equal(control.currentEditMode.value, 'original')
 })

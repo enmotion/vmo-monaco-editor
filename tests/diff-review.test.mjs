@@ -9,7 +9,7 @@ import { renderToString } from '@vue/server-renderer'
 
 async function render(mode, changes, pending = false, hasPreview = false) {
   const source = fs.readFileSync(new URL('../components/vmo-monaco-ui/controls/diff-review.vue', import.meta.url), 'utf8')
-  const target = { hasPreview, currentDisplayMode: mode, currentDiffViewMode: 'inline', lineChanges: changes, diffPending: pending, acceptAllChanges() {}, getLineChanges: () => changes }
+  const target = { hasPreview, currentEditMode: mode === 'preview' ? 'diff' : mode, currentViewMode: mode === 'preview' ? 'preview' : 'edit', currentDiffViewMode: 'inline', lineChanges: changes, diffPending: pending, acceptAllChanges() {}, getLineChanges: () => changes }
   const context = { exports: {}, require(name) {
     if (name === 'vue') return Vue
     if (name === './use-monaco-control') return { createVmoMonacoControlProps: () => ({}), useVmoMonacoControl: () => ({ monacos: Vue.ref([target]) }) }

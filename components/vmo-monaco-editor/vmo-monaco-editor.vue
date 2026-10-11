@@ -70,7 +70,7 @@
 
 <script lang="ts">
 import { defineComponent, ref, shallowRef, onMounted, onBeforeUnmount, onBeforeUpdate, watch, computed, readonly, nextTick } from 'vue'
-import { mergeDeepRight, clone, equals, isNil } from 'ramda'
+import { mergeDeepRight, isNil } from 'ramda'
 import 'monaco-editor/esm/vs/basic-languages/css/css.contribution'
 import 'monaco-editor/esm/vs/basic-languages/xml/xml.contribution'
 import 'monaco-editor/esm/vs/basic-languages/javascript/javascript.contribution'
@@ -79,7 +79,7 @@ import { useReminderPlugin } from '../../index'
 import type { VmoMonacoViewMode } from '../vmo-monaco-diff-editor/types'
 import type { VmoMonacoContext } from '@type'
 import * as Monaco from 'monaco-editor'
-import { syncMonacoOptions } from '../../use.lib/sync-monaco-options'
+import { useEditorOptions, useEditorFullscreen } from '../../use.lib/use-editor-state'
 import { vmoMonacoEditorDefaultOption } from './config'
 
 export default defineComponent({
@@ -143,7 +143,9 @@ export default defineComponent({
   emits: ['update:viewMode', 'view-mode-change', 'change', 'update:modelValue', 'update:monacoOptions', 'options-change', 'update:fullScreen', 'fullscreen-change', 'focuse', 'blur'],
   setup(props, context) {
     // 全屏只影响组件容器位置，不直接改变 Monaco 实例本身。
-    const isFullScreen = ref(props.fullScreen)
+    const { isFullScreen, changeFullScreen, fullscreenSwitch } = useEditorFullscreen(
+      () => props.fullScreen, context.emit
+    )
     // innerValue 是 Monaco 内部真实内容缓存，用于 needConfirm 场景下延迟提交。
     const innerValue = ref('')
     const hasPreview = ref(!!context.slots?.preview)
@@ -172,12 +174,11 @@ export default defineComponent({
     // 自动补全 provider 需要在 remindConfig 更新时 dispose，否则会重复注册同一语言提示。
     const completionProvider = ref([] as Monaco.IDisposable[])
     // 组件内部维护一份可变配置，来源可以是外部 props.monacoOptions，也可以是 UI 控件调用 resetMonacoEditorOptions。
-    const monacoEditorOptions = ref(
-      {} as Partial<Monaco.editor.IStandaloneEditorConstructionOptions & { theme: 'vs-dark' | 'vs-light' }>
+    const { options: monacoEditorOptions, reset: resetMonacoEditorOptions } = useEditorOptions(
+      () => props.monacoOptions, context.emit, 'monacoOptions', 'options-change'
     )
     // 最终配置 = 默认配置 + 当前配置。外部和 UI 控件都只修改 monacoEditorOptions。
     const computedMonacoEditorOption = computed<Partial<Monaco.editor.IStandaloneEditorConstructionOptions & { theme: 'vs-dark' | 'vs-light' }>>(() => {
-      monacoEditorOptions.value
       return mergeDeepRight(vmoMonacoEditorDefaultOption, monacoEditorOptions.value)
     })
     const currentReadOnly = computed(() => props.disabled || !!computedMonacoEditorOption.value.readOnly)
@@ -210,18 +211,6 @@ export default defineComponent({
     }
     watch(() => props.remindConfig, refreshCompletionProviders, { deep: true })
 
-    // 保存外部配置快照，区分深层变更和父组件重渲染，保留工具栏的内部选择。
-    let previousMonacoOptions: typeof props.monacoOptions | undefined
-    watch(
-      () => props.monacoOptions,
-      n => {
-        if (n) {
-          monacoEditorOptions.value = syncMonacoOptions(monacoEditorOptions.value, n, previousMonacoOptions)
-          previousMonacoOptions = clone(n)
-        }
-      },
-      { immediate: true, deep: true }
-    )
     watch(() => computedMonacoEditorOption.value.language, language => {
       const model = monacoEditorInstance.value?.getModel()
       if (model && language && model.getLanguageId() != language) {
@@ -342,36 +331,10 @@ export default defineComponent({
       }
     }
     /**
-     * 重置MonacoEditor的配置
-     * 这是暴露给 vmo-monaco-ui 和各个 control 小组件的统一配置入口。
-     * 小组件不直接操作 monacoEditorInstance，而是通过这里修改内部配置，再由 watcher 统一同步到 Monaco。
-     * @param options 配置
-     */
-    function resetMonacoEditorOptions(options: Partial<Monaco.editor.IStandaloneEditorConstructionOptions>) {
-      const next = mergeDeepRight(monacoEditorOptions.value, options) as typeof monacoEditorOptions.value
-      if (equals(next, monacoEditorOptions.value)) return
-      monacoEditorOptions.value = next
-      context.emit('update:monacoOptions', clone(next))
-      context.emit('options-change', clone(next))
-    }
-    /**
      * 刷新 MonacoEditor
      */
     function refreshMonacoEditor() {
       initMonacoEditor(innerValue.value)
-    }
-    /**
-     * 全屏切换
-     */
-    watch(() => props.fullScreen, value => changeFullScreen(value))
-    function changeFullScreen(value: boolean) {
-      if (value === isFullScreen.value) return
-      isFullScreen.value = value
-      context.emit('update:fullScreen', value)
-      context.emit('fullscreen-change', value)
-    }
-    function fullscreenSwitch() {
-      changeFullScreen(!isFullScreen.value)
     }
     /**
      * 提交当前 Monaco 内容。

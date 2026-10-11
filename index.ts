@@ -32,7 +32,6 @@ import type {
 import type {
   VmoMonacoDiffChangePayload,
   VmoMonacoDiffConfirmPayload,
-  VmoMonacoDiffDisplayMode,
   VmoMonacoDiffReviewActionPayload,
   VmoMonacoDiffViewMode
 } from '@comps/vmo-monaco-diff-editor/vmo-monaco-diff-editor.vue'
@@ -95,7 +94,6 @@ export {
   VmoMonacoEditorOption,
   VmoMonacoDiffChangePayload,
   VmoMonacoDiffConfirmPayload,
-  VmoMonacoDiffDisplayMode,
   VmoMonacoDiffReviewActionPayload,
   VmoMonacoDiffViewMode,
   VmoMonacoCommitControlConfig,

@@ -22,11 +22,10 @@ function load(targets) {
   return component
 }
 function editor(mode, hasPreview = true) {
-  let previous = mode
   return Vue.reactive({
-    hasPreview, currentDisplayMode: mode,
-    changeDisplayMode(next) { previous = this.currentDisplayMode; this.currentDisplayMode = next },
-    togglePreview() { this.currentDisplayMode = previous }
+    hasPreview, currentViewMode: 'edit', currentEditMode: mode,
+    changeViewMode(next) { this.currentViewMode = next },
+    togglePreview() { this.currentViewMode = this.currentViewMode === 'preview' ? 'edit' : 'preview' }
   })
 }
 test('standalone preview control enters and restores each eligible target independently', () => {
@@ -35,13 +34,13 @@ test('standalone preview control enters and restores each eligible target indepe
   const control = load([original, diff, unavailable]).setup({}, { emit: (...event) => events.push(event) })
   control.togglePreview()
   assert.equal(control.currentValue.value, true)
-  assert.equal(original.currentDisplayMode, 'preview')
-  assert.equal(diff.currentDisplayMode, 'preview')
-  assert.equal(unavailable.currentDisplayMode, 'modified')
+  assert.equal(original.currentViewMode, 'preview')
+  assert.equal(diff.currentViewMode, 'preview')
+  assert.equal(unavailable.currentViewMode, 'edit')
   assert.equal(events.at(-1)[1].monacoCount, 2)
   control.togglePreview()
-  assert.equal(original.currentDisplayMode, 'original')
-  assert.equal(diff.currentDisplayMode, 'diff')
+  assert.equal(original.currentViewMode, 'edit')
+  assert.equal(diff.currentViewMode, 'edit')
   assert.equal(control.currentValue.value, false)
 })
 test('preview toggle is a standalone accessible button and supports custom content', async () => {
@@ -74,17 +73,17 @@ test('preview toggle honors controlled state and tolerates an empty editor selec
 test('preview props synchronize targets while unchanged props preserve internal toggles', () => {
   const target = editor('original'), scope = Vue.effectScope(), props = Vue.reactive({ value: true }), events = []
   const control = scope.run(() => load([target]).setup(props, { emit: (...e) => events.push(e) }))
-  assert.equal(target.currentDisplayMode, 'preview')
+  assert.equal(target.currentViewMode, 'preview')
   control.togglePreview()
-  assert.equal(target.currentDisplayMode, 'original')
+  assert.equal(target.currentViewMode, 'edit')
   assert.equal(control.currentValue.value, false)
   assert.equal(props.value, true)
   control.togglePreview()
   props.value = false
-  assert.equal(target.currentDisplayMode, 'original')
+  assert.equal(target.currentViewMode, 'edit')
   assert.equal(control.currentValue.value, false)
   props.value = true
-  assert.equal(target.currentDisplayMode, 'preview')
+  assert.equal(target.currentViewMode, 'preview')
   assert.equal(control.currentValue.value, true)
   props.value = undefined
   target.togglePreview()

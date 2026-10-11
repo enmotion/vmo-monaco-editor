@@ -13,44 +13,45 @@
       <slot
         :line-changes="lineChanges"
         :diff-pending="diffPending"
-        :current-display-mode="currentDisplayMode"
+        :current-edit-mode="currentEditMode"
+        :current-view-mode="currentViewMode"
         :has-preview="hasPreview"
         :accept-change="acceptChange"
         :reject-change="rejectChange"
         :accept-all-changes="acceptAllChanges"
         :reject-all-changes="rejectAllChanges"
-        :change-display-mode="changeDisplayMode"
+        :change-edit-mode="changeEditMode"
         :change-diff-view-mode="changeDiffViewMode"
         :confirm="confirm">
         <span class="reviewPanelRow">
           <button
-            :class="['reviewPanelButton iconfont vmo-para', currentDisplayMode == 'original' ? 'is-active' : '']"
+            :class="['reviewPanelButton iconfont vmo-para', currentEditMode == 'original' ? 'is-active' : '']"
             type="button"
             title="Original"
             aria-label="Original"
-            @click="changeDisplayMode('original')">
+            @click="changeEditMode('original')">
             <span class="reviewPanelIcon"></span>
           </button>
           <button
-            :class="['reviewPanelButton iconfont vmo-modify', currentDisplayMode == 'modified' ? 'is-active' : '']"
+            :class="['reviewPanelButton iconfont vmo-modify', currentEditMode == 'modified' ? 'is-active' : '']"
             type="button"
             title="Proposal"
             aria-label="Proposal"
-            @click="changeDisplayMode('modified')">
+            @click="changeEditMode('modified')">
             <span class="reviewPanelIcon"></span>
           </button>
           <button
-            :class="['reviewPanelButton iconfont vmo-diff', currentDisplayMode == 'diff' ? 'is-active' : '']"
+            :class="['reviewPanelButton iconfont vmo-diff', currentEditMode == 'diff' ? 'is-active' : '']"
             type="button"
             title="Diff"
             aria-label="Diff"
-            @click="changeDisplayMode('diff')">
+            @click="changeEditMode('diff')">
             <span class="reviewPanelIcon"></span>
           </button>
         </span>
-        <div v-if="currentDisplayMode != 'preview'" class="flex flex-row items-center gap-[5px]">
+        <div v-if="currentViewMode == 'edit'" class="flex flex-row items-center gap-[5px]">
            <span
-            v-if="currentDisplayMode == 'original' || currentDisplayMode == 'modified'"
+            v-if="currentEditMode == 'original' || currentEditMode == 'modified'"
             class="reviewCount"
             :title="diffPending ? 'Calculating differences' : `${lineChanges.length} diff blocks`"
             :aria-label="diffPending ? 'Calculating differences' : `${lineChanges.length} diff blocks`"
@@ -59,7 +60,7 @@
               <span>{{ diffPending ? '…' : lineChanges.length }}</span>
           </span>
           <button
-            v-if="currentDisplayMode == 'diff'"
+            v-if="currentEditMode == 'diff'"
             :class="['reviewPanelButton grow iconfont vmo-split', currentDiffViewMode == 'side-by-side' ? 'is-active' : '']"
             type="button"
             title="Side by side"
@@ -68,7 +69,7 @@
             <span class="reviewPanelIcon"></span>
           </button>
           <button
-            v-if="currentDisplayMode == 'diff'"
+            v-if="currentEditMode == 'diff'"
             :class="['reviewPanelButton iconfont vmo-mix', currentDiffViewMode == 'inline' ? 'is-active' : '']"
             type="button"
             title="Inline"
@@ -77,7 +78,7 @@
             <span class="reviewPanelIcon"></span>
           </button>
         </div>
-        <span v-if="currentDisplayMode == 'diff'" class="flex flex-row items-center gap-[5px]">
+        <span v-if="currentViewMode == 'edit' && currentEditMode == 'diff'" class="flex flex-row items-center gap-[5px]">
           <button class="reviewPanelButton grow is-reject" type="button" title="Reject all" aria-label="Reject all" :disabled="!canReview" @click="rejectAllChanges">
             <span class="reviewPanelIcon !text-xs font-normal iconfont vmo-sub"></span>
           </button>
@@ -145,7 +146,7 @@ export default defineComponent({
   props: {
     ...createVmoMonacoControlProps<VmoMonacoDiffReviewControlValue, VmoMonacoDiffReviewControlConfig>()
   },
-  emits: ['accept-all', 'reject-all', 'confirm', 'accept-change', 'reject-change', 'display-mode-change', 'diff-view-mode-change'],
+  emits: ['accept-all', 'reject-all', 'confirm', 'accept-change', 'reject-change', 'edit-mode-change', 'diff-view-mode-change'],
   setup(props, context) {
     const { monacos } = useVmoMonacoControl(props)
     const ReviewActionsRef = ref(null as HTMLElement | null)
@@ -160,9 +161,10 @@ export default defineComponent({
     })
     const diffPending = computed(() => primaryDiffMonaco.value?.diffPending ?? false)
     const canReview = computed(() => !diffPending.value && lineChanges.value.length > 0)
-    const currentDisplayMode = computed(() => {
-      return primaryDiffMonaco.value?.currentDisplayMode || 'diff'
+    const currentEditMode = computed(() => {
+      return primaryDiffMonaco.value?.currentEditMode || 'diff'
     })
+    const currentViewMode = computed(() => primaryDiffMonaco.value?.currentViewMode || 'edit')
     const hasPreview = computed(() => primaryDiffMonaco.value?.hasPreview ?? false)
     const currentDiffViewMode = computed(() => {
       return primaryDiffMonaco.value?.currentDiffViewMode || 'side-by-side'
@@ -193,12 +195,9 @@ export default defineComponent({
       }
     }
 
-    function changeDisplayMode(mode: VmoMonacoDiffEditorExpose['currentDisplayMode']) {
-      diffMonacos.value.filter(monaco => mode != 'preview' || monaco.hasPreview).forEach(monaco => {
-        if (mode !== 'preview' && typeof monaco.changeEditMode === 'function') monaco.changeEditMode(mode)
-        else monaco.changeDisplayMode(mode)
-      })
-      context.emit('display-mode-change', createPayload('display-mode-change', undefined, { mode }))
+    function changeEditMode(mode: VmoMonacoDiffEditorExpose['currentEditMode']) {
+      diffMonacos.value.forEach(monaco => monaco.changeEditMode(mode))
+      context.emit('edit-mode-change', createPayload('edit-mode-change', undefined, { mode }))
     }
 
     function changeDiffViewMode(mode: VmoMonacoDiffEditorExpose['currentDiffViewMode']) {
@@ -253,7 +252,8 @@ export default defineComponent({
       lineChanges,
       diffPending,
       canReview,
-      currentDisplayMode,
+      currentEditMode,
+      currentViewMode,
       hasPreview,
       currentDiffViewMode,
       togglePanel,
@@ -261,7 +261,7 @@ export default defineComponent({
       rejectChange,
       acceptAllChanges,
       rejectAllChanges,
-      changeDisplayMode,
+      changeEditMode,
       changeDiffViewMode,
       confirm
     }

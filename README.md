@@ -6,19 +6,17 @@
 
 两个编辑器的插槽一致：`default`、`prefix`、`preview`、`suffix`。preview 参数为 `{ content, language, source, theme }`，普通编辑器的 source 固定为 original。没有 preview 插槽时无法进入预览；移除插槽会返回 edit，保留差异编辑器的 editMode。普通编辑器切换时保留 Monaco 实例和草稿。
 
-差异编辑器的 `displayMode`、`currentDisplayMode`、`changeDisplayMode` 是已弃用的兼容接口；currentDisplayMode 是派生值：viewMode 为 preview 时返回 preview，否则返回 editMode。显式的新 props 对各自维度优先。新接入请分别绑定两个状态。
-
 ```vue
 <VmoMonacoEditor v-model="body" v-model:view-mode="viewMode">
   <template #preview="{ content, language, source, theme }">
-    <VmoPlainTextPreview :content="content" :theme="theme" />
+    <VmoTextPreview :content="content" :theme="theme" />
   </template>
 </VmoMonacoEditor>
 <VmoMonacoDiffEditor
   v-model:original-value="body" v-model:modified-value="proposal"
   v-model:view-mode="viewMode" v-model:edit-mode="editMode">
   <template #preview="{ content, language, source, theme }">
-    <VmoPlainTextPreview :content="content" :theme="theme" />
+    <VmoTextPreview :content="content" :theme="theme" />
   </template>
 </VmoMonacoDiffEditor>
 ```
@@ -254,7 +252,7 @@ Review events such as `accept-all` and `reject-change` still emit so the host ap
 
 ## Display state and two-way bindings
 
-The UI separates content (original, proposal, diff) from interaction mode (edit, readonly, preview). The API uses independent viewMode and editMode; four `displayMode` values remain only for compatibility; `previewSource` selects the previewed content. `disabled`, `editableOriginal` and `editableModified` determine editing permissions; `currentReadOnly` exposes the current view's editing restriction.
+The UI separates content (original, proposal, diff) from interaction mode (edit, readonly, preview). The API uses independent viewMode and editMode; `previewSource` selects the previewed content. `disabled`, `editableOriginal` and `editableModified` determine editing permissions; `currentReadOnly` exposes the current view's editing restriction.
 
 | State | Prop / v-model | Update event |
 | --- | --- | --- |
@@ -282,7 +280,7 @@ Props initialize local state. Internal actions update it before emitting events.
 
 Define the binding variables in the parent: for example `'diff'`, `'modified'`, `'side-by-side'`, `{}`, `{}` and `false`, respectively. See the [complete toolbar binding example](docs/en/guide/toolbar.md#state-bindings). `needConfirm` delays original/proposal content submission only; all state updates remain immediate. Preview requires a `preview` slot.
 
-To receive notifications without writing back, use `:edit-mode="editMode" @update:edit-mode="handleMode($event)"`. Existing `mode-change` and `preview-source-change` events remain available, alongside `diff-view-mode-change`, `options-change`, `diff-options-change` and `fullscreen-change`. Listen on the editor itself for changes initiated by the default toolbar; UI forwarding is unnecessary.
+To receive notifications without writing back, use `:edit-mode="editMode" @update:edit-mode="handleMode($event)"`. `edit-mode-change`, `view-mode-change`, and `preview-source-change` independently notify their state changes, alongside `diff-view-mode-change`, `options-change`, `diff-options-change` and `fullscreen-change`. Listen on the editor itself for changes initiated by the default toolbar; UI forwarding is unnecessary.
 
 ### `VmoMonacoDiffEditor` Props
 
@@ -292,7 +290,6 @@ To receive notifications without writing back, use `:edit-mode="editMode" @updat
 | `modifiedValue` | `string` | `''` | Modified/proposal text. Supports `v-model:modified-value`. |
 | `prefix` | `string` | `''` | Extra content above the editor. |
 | `suffix` | `string` | `''` | Extra content below the editor. |
-| `displayMode` | `'original' \| 'modified' \| 'diff' \| 'preview'` | `'diff'` | Show original, modified, diff, or the supplied preview slot. |
 | `previewSource` | `'original' \| 'modified'` | Unset | Override the source selected when entering preview; supports external updates. |
 | `diffViewMode` | `'side-by-side' \| 'inline'` | `'side-by-side'` | Diff rendering mode. |
 | `editableOriginal` | `boolean` | `false` | Allow editing original side/model. |
@@ -312,7 +309,6 @@ To receive notifications without writing back, use `:edit-mode="editMode" @updat
 
 | Event | Payload | Description |
 | --- | --- | --- |
-| `update:displayMode` | Display mode string | Actual display mode changes. |
 | `update:previewSource` | original / modified | Actual preview source changes. |
 | `update:diffViewMode` / `diff-view-mode-change` | side-by-side / inline | Actual diff layout changes. |
 | `update:monacoOptions` / `options-change` | `VmoMonacoEditorOption` | Controls or API change shared options. |
@@ -329,7 +325,6 @@ To receive notifications without writing back, use `:edit-mode="editMode" @updat
 | `focuse` | `void` | Editor focus event. |
 | `blur` | `void` | Editor blur event. |
 | `preview-source-change` | `'original' \| 'modified'` | Preview source changed. |
-| `mode-change` | `'original' \| 'modified' \| 'diff' \| 'preview'` | Display mode changed. |
 
 ### `VmoMonacoDiffEditor` Exposed Methods
 
@@ -339,7 +334,7 @@ diffRef.value.resetMonacoDiffEditorOptions(options)
 diffRef.value.changeFullScreen(true)
 diffRef.value.fullscreenSwitch()
 diffRef.value.changeLanguage(language)
-diffRef.value.changeDisplayMode('diff')
+diffRef.value.changeEditMode('diff')
 diffRef.value.changeDiffViewMode('inline')
 diffRef.value.acceptChange(index)
 diffRef.value.rejectChange(index)
@@ -441,8 +436,8 @@ It also exposes a `review-actions` slot through `VmoMonacoUi`:
 
 ```vue
 <vmo-monaco-ui :monaco="diffRef" :config="{ reviewActions: true }">
-  <template #review-actions="{ lineChanges, acceptAllChanges, rejectAllChanges, changeDisplayMode }">
-    <button @click="changeDisplayMode('diff')">Diff</button>
+  <template #review-actions="{ lineChanges, acceptAllChanges, rejectAllChanges, changeEditMode }">
+    <button @click="changeEditMode('diff')">Diff</button>
     <button @click="rejectAllChanges()">Reject {{ lineChanges.length }}</button>
     <button @click="acceptAllChanges()">Accept</button>
   </template>
@@ -591,7 +586,7 @@ Run `npm run dev` and open `/preview.html` for the interactive example with cont
 theme, unstyled and custom-style controls.
 
 
-### Editor Preview Mode
+### Editor Preview EditMode
 
 ```vue
 <vmo-monaco-diff-editor
@@ -614,7 +609,7 @@ three preview components or your own renderer inside it.
 
 Without an explicit `previewSource`, entering preview from Original selects the original draft; entering from Proposal or Diff selects the proposal. An explicit source prop initializes the source and synchronizes on actual external changes. Local source changes remain effective while that prop is unchanged, including on re-entry into preview. The status row changes editMode independently; the preview source buttons change previewSource without leaving preview. Preview does not commit text or replace the two models. Removing the slot returns to edit and preserves editMode.
 
-Use `v-model:view-mode` and `v-model:preview-source` to track view and source, or listen to `@update:view-mode="handleMode($event)"` and `@update:preview-source="handleSource($event)"` without writing back. The editor retains `mode-change` and `preview-source-change` notifications. Neither `needConfirm` nor `bidibind` delays these state updates. Preview itself has no editable input; `currentReadOnly` describes the editor view's editing permission.
+Use `v-model:view-mode` and `v-model:preview-source` to track view and source, or listen to `@update:view-mode="handleMode($event)"` and `@update:preview-source="handleSource($event)"` without writing back. The editor emits `view-mode-change` and `preview-source-change` notifications independently. Neither `needConfirm` nor `bidibind` delays these state updates. Preview itself has no editable input; `currentReadOnly` describes the editor view's editing permission.
 
 The public API includes `togglePreview()`, `changeViewMode('preview')`,
 `changePreviewSource('original' | 'modified')`, `hasPreview`, and
@@ -669,14 +664,15 @@ Review slot props are identical for UI review-actions and standalone review defa
 | --- | --- | --- |
 | `lineChanges` | `Monaco.editor.ILineChange[]` | Current diff blocks from the first diff target; avoid stale indexes during calculation |
 | `diffPending` | `boolean` | Whether the latest diff is still calculating |
-| `currentDisplayMode` | `Mode` | Current display mode |
+| `currentEditMode` | `EditMode` | Current display mode |
+| `currentViewMode` | `ViewMode` | 当前编辑／预览状态，独立于 editMode |
 | `hasPreview` | `boolean` | Whether the first diff target provides a preview slot |
 | `acceptChange` | `(index: number) => void` | Accept a block from the current diff array |
 | `rejectChange` | `(index: number) => void` | Reject a block from the current diff array |
 | `acceptAllChanges` | `() => void` | Accept all changes |
 | `rejectAllChanges` | `() => void` | Reject all changes |
-| `changeDisplayMode` | `(mode: Mode) => void` | Switch display mode; preview applies only to preview-capable targets |
-| `changeDiffViewMode` | `(mode: ViewMode) => void` | Switch side-by-side/inline layout |
+| `changeEditMode` | `(mode: EditMode) => void` | Select original/proposal/diff without changing viewMode or previewSource |
+| `changeDiffViewMode` | `(mode: LayoutMode) => void` | Switch side-by-side/inline layout |
 | `confirm` | `() => void` | Confirm the current content |
 
 Destructure camelCase names even though template bindings use kebab-case. The slot does not supply `canReview`, `currentDiffViewMode` or `closePanel`. Disable bulk buttons using `diffPending || !lineChanges.length`; the methods themselves do not enforce this condition.
@@ -695,3 +691,10 @@ Destructure camelCase names even though template bindings use kebab-case. The sl
 With a custom UI default slot, review-actions is not automatically forwarded to a manually inserted review control; use that control's default slot. Prefix/suffix slots replace only their extra-content regions. Preview replaces only its content region, retaining the outer preview container/source buttons.
 
 See the per-component slot tables and examples in the [Chinese API reference](docs/guide/api.md) and [English API reference](docs/en/guide/api.md).
+
+
+### Shared state implementation / 共同状态实现
+
+两个编辑器复用内部配置与全屏组合函数；props、事件、方法和插槽契约保持不变。配置内部变化发出独立事件快照，相同值不重复发出事件，等价外部配置保留内部选择。维护说明与完整行为规则见[中文 API](docs/guide/api.md#配置与全屏状态的共同约定)。
+
+Both editors reuse internal options and fullscreen composables without changing their public contracts. Internal options changes emit independent snapshots; identical values do not duplicate events, and equivalent external options preserve local choices. See the [English API](docs/en/guide/api.md#shared-options-and-fullscreen-behavior) for the behavior and implementation notes.

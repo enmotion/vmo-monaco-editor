@@ -201,11 +201,10 @@ export default defineComponent({
     const editorOption = computed(() => monacos.value[0]?.computedMonacoEditorOption || {})
     const theme = computed(() => editorOption.value.theme || 'vs-light')
     const diffMonacos = computed(() => monacos.value.filter((target): target is VmoMonacoDiffEditorExpose =>
-      typeof (target as Partial<VmoMonacoDiffEditorExpose>)?.changeDisplayMode === 'function'))
+      typeof (target as Partial<VmoMonacoDiffEditorExpose>)?.changeEditMode === 'function'))
     const primaryDiff = computed(() => diffMonacos.value[0])
-    const isPreview = computed(() => monacos.value[0]?.currentViewMode === 'preview' || primaryDiff.value?.currentDisplayMode === 'preview')
-    const currentContentMode = computed(() => primaryDiff.value?.currentEditMode ?? (isPreview.value
-      ? primaryDiff.value?.currentPreviewSource : primaryDiff.value?.currentDisplayMode || 'original'))
+    const isPreview = computed(() => monacos.value[0]?.currentViewMode === 'preview')
+    const currentContentMode = computed(() => primaryDiff.value?.currentEditMode || 'original')
     const diffViewLabel = computed(() => primaryDiff.value?.currentDiffViewMode === 'inline' ? '行内' : '并排')
     const interactionLabel = computed(() => isPreview.value ? '预览'
       : (monacos.value[0]?.currentReadOnly ?? editorOption.value.readOnly) ? '只读' : '编辑')
@@ -215,11 +214,7 @@ export default defineComponent({
       { value: 'diff', label: '比对' }
     ] as const
     function changeContentMode(mode: 'original' | 'modified' | 'diff') {
-      diffMonacos.value.forEach(editor => {
-        if (typeof editor.changeEditMode === 'function') editor.changeEditMode(mode)
-        else if (editor.currentDisplayMode === 'preview' && mode !== 'diff') editor.changePreviewSource(mode)
-        else editor.changeDisplayMode(mode)
-      })
+      diffMonacos.value.forEach(editor => editor.changeEditMode(mode))
     }
     const monacoNeedConfirm = computed(() => monacos.value.some(monaco => monaco?.needConfirm))
 

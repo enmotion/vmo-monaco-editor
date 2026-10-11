@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { VmoMonacoDiffEditor, VmoMonacoEditor, VmoMonacoUi, VmoMonacoPreviewToggle, VmoTextPreview, useReminderPlugin } from '../index'
 import * as Monaco from 'monaco-editor'
 import fontSizeInput from '@comps/vmo-monaco-ui/controls/font-size-input.vue'
@@ -12,7 +12,7 @@ import previewToggle from '@comps/vmo-monaco-ui/controls/preview-toggle.vue'
 const codeContent = ref('SELECT * FROM table_name')
 const codeContent2 = ref('SELECT * FROM table_name')
 const appTheme = ref<'vs-light' | 'vs-dark'>('vs-light')
-const diffDisplayMode = ref<'original' | 'modified' | 'diff'>('original')
+const diffEditMode = ref<'original' | 'modified' | 'diff'>('original')
 const diffViewMode = ref<'side-by-side' | 'inline'>('side-by-side')
 const originalContent = ref(`项目上线前，产品团队需要完成一次完整的文字校对工作。
 
@@ -36,7 +36,8 @@ const disabled = ref(true)
 function toggleAppTheme() {
   appTheme.value = appTheme.value == 'vs-light' ? 'vs-dark' : 'vs-light'
 }
-const isPreview=ref(true)
+const viewMode = ref<'edit' | 'preview'>('edit')
+const isPreview = computed(() => viewMode.value === 'preview')
 const remindConfig = ref([
   {
     language: 'sql',
@@ -105,9 +106,9 @@ const remindConfig = ref([
       </div>
       <div class="mt-[10px] text-xs text-gray-700">Diff display mode</div>
       <div class="flex flex-row gap-[6px] mt-[6px]">
-        <button class="border px-[8px] py-[4px]" @click="diffDisplayMode = 'original'">原文</button>
-        <button class="border px-[8px] py-[4px]" @click="diffDisplayMode = 'modified'">改后</button>
-        <button class="border px-[8px] py-[4px]" @click="diffDisplayMode = 'diff'">Diff</button>
+        <button class="border px-[8px] py-[4px]" @click="diffEditMode = 'original'">原文</button>
+        <button class="border px-[8px] py-[4px]" @click="diffEditMode = 'modified'">改后</button>
+        <button class="border px-[8px] py-[4px]" @click="diffEditMode = 'diff'">Diff</button>
       </div>
       <div class="flex flex-row gap-[6px] mt-[6px]">
         <button class="border px-[8px] py-[4px]" @click="diffViewMode = 'side-by-side'">并排</button>
@@ -169,11 +170,11 @@ const remindConfig = ref([
           }
         }"
         :need-confirm="true"
-        :display-mode="diffDisplayMode"
+        v-model:edit-mode="diffEditMode"
+        v-model:view-mode="viewMode"
         :diff-view-mode="diffViewMode"
         :editable-original="true"
         :editable-modified="true"
-        @mode-change="isPreview = $event === 'preview'"
         class="flex-grow border-t border-t-[#88888844]">
         <vmo-monaco-ui
           title="Text-Diff"
