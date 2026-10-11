@@ -23,7 +23,7 @@
 
 <script lang="ts">
 import { computed, defineComponent } from 'vue'
-import type { VmoMonacoDiffEditorExpose } from '@type'
+import type { VmoMonacoEditorExpose } from '@type'
 import { createVmoMonacoControlProps, useVmoMonacoControl, useVmoMonacoControlValue } from './use-monaco-control'
 
 export type VmoMonacoPreviewControlValue = boolean
@@ -37,19 +37,23 @@ export default defineComponent({
   emits: ['update:value', 'toggle', 'commit'],
   setup(props, context) {
     const { monacos } = useVmoMonacoControl(props)
-    const previewMonacos = computed(() => monacos.value.filter((target): target is VmoMonacoDiffEditorExpose => {
-      const editor = target as Partial<VmoMonacoDiffEditorExpose>
+    const previewMonacos = computed(() => monacos.value.filter((target): target is VmoMonacoEditorExpose => {
+      const editor = target as Partial<VmoMonacoEditorExpose>
       return !!editor.hasPreview && typeof editor.togglePreview == 'function'
     }))
     function applyPreview(value: boolean) {
       previewMonacos.value.forEach(editor => {
-        if (value && editor.currentDisplayMode != 'preview') editor.changeDisplayMode('preview')
-        if (!value && editor.currentDisplayMode == 'preview') editor.togglePreview()
+        if (typeof editor.changeViewMode === 'function') editor.changeViewMode(value ? 'preview' : 'edit')
+        else {
+          const legacy = editor as unknown as { currentDisplayMode: string; changeDisplayMode: (mode: 'preview') => void; togglePreview: () => void }
+          if (value && legacy.currentDisplayMode != 'preview') legacy.changeDisplayMode('preview')
+          if (!value && legacy.currentDisplayMode == 'preview') legacy.togglePreview()
+        }
       })
     }
     const currentValue = useVmoMonacoControlValue(
       () => props.value,
-      () => previewMonacos.value[0]?.currentDisplayMode == 'preview',
+      () => previewMonacos.value[0]?.currentViewMode === 'preview' || (previewMonacos.value[0] as unknown as { currentDisplayMode?: string })?.currentDisplayMode === 'preview',
       applyPreview
     )
 

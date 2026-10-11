@@ -1,4 +1,4 @@
-import type { VmoMonacoDiffDisplayMode, VmoMonacoPreviewSource } from '../components/vmo-monaco-diff-editor/types'
+import type { VmoMonacoViewMode, VmoMonacoDiffEditMode, VmoMonacoDiffDisplayMode, VmoMonacoPreviewSource } from '../components/vmo-monaco-diff-editor/types'
 import type * as Monaco from 'monaco-editor'
 
 export type VmoMonacoContext = {
@@ -25,6 +25,11 @@ export type VmoMonacoEditorOption = Partial<
 >
 
 export type VmoMonacoEditorExpose = {
+  currentViewMode: VmoMonacoViewMode
+  hasPreview: boolean
+  togglePreview: () => void
+  changeViewMode: (mode: VmoMonacoViewMode) => void
+  currentPreviewSource: VmoMonacoPreviewSource
   currentReadOnly?: boolean
   resetMonacoEditorOptions: (options: VmoMonacoEditorOption) => void
   fullscreenSwitch: () => void
@@ -38,6 +43,9 @@ export type VmoMonacoEditorExpose = {
 }
 
 export type VmoMonacoDiffEditorExpose = VmoMonacoEditorExpose & {
+  currentEditMode: VmoMonacoDiffEditMode
+  changeEditMode: (mode: VmoMonacoDiffEditMode) => void
+  /** @deprecated Read-only projection of viewMode/editMode. */
   currentDisplayMode: VmoMonacoDiffDisplayMode
   togglePreview: () => void
   hasPreview: boolean

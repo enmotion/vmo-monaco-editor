@@ -1,5 +1,29 @@
 # 普通编辑器
 
+## 独立的视图状态与内容状态
+
+两个编辑器都提供 `viewMode: 'edit' | 'preview'`，支持 `v-model:view-mode`、`update:viewMode` 与 `view-mode-change`。差异编辑器另提供 `editMode: 'original' | 'modified' | 'diff'`，支持 `v-model:edit-mode`、`update:editMode` 与 `edit-mode-change`。改变任一状态不会改变另一状态。`diffViewMode` 仅表示比对布局，`previewSource` 仅表示预览草稿来源。props 初始化内部状态，外部实际改变时同步；外部不回写则保留内部操作结果。
+
+两个编辑器的插槽一致：`default`、`prefix`、`preview`、`suffix`。preview 参数为 `{ content, language, source, theme }`，普通编辑器的 source 固定为 original。没有 preview 插槽时无法进入预览；移除插槽会返回 edit，保留差异编辑器的 editMode。普通编辑器切换时保留 Monaco 实例和草稿。
+
+差异编辑器的 `displayMode`、`currentDisplayMode`、`changeDisplayMode` 是已弃用的兼容接口；currentDisplayMode 是派生值：viewMode 为 preview 时返回 preview，否则返回 editMode。显式的新 props 对各自维度优先。新接入请分别绑定两个状态。
+
+```vue
+<VmoMonacoEditor v-model="body" v-model:view-mode="viewMode">
+  <template #preview="{ content, language, source, theme }">
+    <VmoPlainTextPreview :content="content" :theme="theme" />
+  </template>
+</VmoMonacoEditor>
+<VmoMonacoDiffEditor
+  v-model:original-value="body" v-model:modified-value="proposal"
+  v-model:view-mode="viewMode" v-model:edit-mode="editMode">
+  <template #preview="{ content, language, source, theme }">
+    <VmoPlainTextPreview :content="content" :theme="theme" />
+  </template>
+</VmoMonacoDiffEditor>
+```
+
+
 props、emit 与完整实例成员清单见[组件 API 完整参考](./api)。
 
 `VmoMonacoEditor` 通过 `v-model` 编辑一个字符串。配置放在 `monacoOptions`，工具栏通过组件实例调用公开方法。

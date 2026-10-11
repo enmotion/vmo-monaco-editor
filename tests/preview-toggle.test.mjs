@@ -91,3 +91,14 @@ test('preview props synchronize targets while unchanged props preserve internal 
   assert.equal(control.currentValue.value, false)
   scope.stop()
 })
+
+test('preview control supports ordinary and diff editors through independent viewMode', () => {
+  const targets = ['original', 'diff'].map(editMode => Vue.reactive({ hasPreview: true, currentViewMode: 'edit', editMode,
+    changeViewMode(mode) { this.currentViewMode = mode }, togglePreview() {} }))
+  const control = load(targets).setup({}, { emit() {} })
+  control.togglePreview()
+  assert.equal(targets[0].currentViewMode, 'preview')
+  assert.equal(targets[1].editMode, 'diff')
+  control.togglePreview()
+  assert.equal(targets[1].currentViewMode, 'edit')
+})

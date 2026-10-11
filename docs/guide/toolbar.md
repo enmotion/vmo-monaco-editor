@@ -1,5 +1,29 @@
 # 工具栏与控件
 
+## 独立的视图状态与内容状态
+
+两个编辑器都提供 `viewMode: 'edit' | 'preview'`，支持 `v-model:view-mode`、`update:viewMode` 与 `view-mode-change`。差异编辑器另提供 `editMode: 'original' | 'modified' | 'diff'`，支持 `v-model:edit-mode`、`update:editMode` 与 `edit-mode-change`。改变任一状态不会改变另一状态。`diffViewMode` 仅表示比对布局，`previewSource` 仅表示预览草稿来源。props 初始化内部状态，外部实际改变时同步；外部不回写则保留内部操作结果。
+
+两个编辑器的插槽一致：`default`、`prefix`、`preview`、`suffix`。preview 参数为 `{ content, language, source, theme }`，普通编辑器的 source 固定为 original。没有 preview 插槽时无法进入预览；移除插槽会返回 edit，保留差异编辑器的 editMode。普通编辑器切换时保留 Monaco 实例和草稿。
+
+差异编辑器的 `displayMode`、`currentDisplayMode`、`changeDisplayMode` 是已弃用的兼容接口；currentDisplayMode 是派生值：viewMode 为 preview 时返回 preview，否则返回 editMode。显式的新 props 对各自维度优先。新接入请分别绑定两个状态。
+
+```vue
+<VmoMonacoEditor v-model="body" v-model:view-mode="viewMode">
+  <template #preview="{ content, language, source, theme }">
+    <VmoPlainTextPreview :content="content" :theme="theme" />
+  </template>
+</VmoMonacoEditor>
+<VmoMonacoDiffEditor
+  v-model:original-value="body" v-model:modified-value="proposal"
+  v-model:view-mode="viewMode" v-model:edit-mode="editMode">
+  <template #preview="{ content, language, source, theme }">
+    <VmoPlainTextPreview :content="content" :theme="theme" />
+  </template>
+</VmoMonacoDiffEditor>
+```
+
+
 props、emit 与完整实例成员清单见[组件 API 完整参考](./api)。
 
 `VmoMonacoUi` 接收一个编辑器实例或实例数组，将其注入到内部控件。控件调用组件公开方法，不要求你自己操作 Monaco 原始实例。
@@ -31,7 +55,7 @@ props、emit 与完整实例成员清单见[组件 API 完整参考](./api)。
 
 ## 当前状态与视图切换
 
-工具栏第二行持续展示两个维度：**内容**（正文／提案／比对）和**模式**（编辑／只读／预览）。比对会标明并排或行内；预览会高亮实际预览的正文或提案。预览中切换正文／提案只改变预览来源，点击比对则退出预览。预览按钮显示“返回编辑器”时，点击会恢复进入预览前的编辑器视图。
+工具栏第二行持续展示两个维度：**内容**（正文／提案／比对）和**模式**（编辑／只读／预览）。比对会标明并排或行内；预览会高亮实际预览的正文或提案。预览中切换正文／提案／比对只改变 editMode，预览来源由 previewSource 独立控制。预览按钮显示“返回编辑器”时，点击会恢复进入预览前的编辑器视图。
 
 绑定编辑器后，当前语言、字号（px）、主题和待确认状态会跟随实例变化显示，即使对应设置控件隐藏也可以查看。传入实例数组时，当前视图及设置以首个对应实例为准，切换作用于所有对应实例。自定义默认插槽替换上方工具栏，状态行仍然保留。
 
@@ -43,14 +67,15 @@ props、emit 与完整实例成员清单见[组件 API 完整参考](./api)。
 <script setup lang="ts">
 import { ref } from 'vue'
 import { VmoMonacoDiffEditor, VmoMonacoUi, VmoTextPreview } from 'vmo-monaco-editor'
-import type { VmoMonacoDiffDisplayMode, VmoMonacoDiffViewMode, VmoMonacoPreviewSource, VmoMonacoEditorOption } from 'vmo-monaco-editor'
+import type { VmoMonacoDiffEditMode, VmoMonacoViewMode, VmoMonacoDiffViewMode, VmoMonacoPreviewSource, VmoMonacoEditorOption } from 'vmo-monaco-editor'
 import type { editor as MonacoEditor } from 'monaco-editor'
 import 'vmo-monaco-editor/dist/style.css'
 
 const diffRef = ref()
 const original = ref('Original text')
 const proposal = ref('Proposed text')
-const displayMode = ref<VmoMonacoDiffDisplayMode>('diff')
+const editMode = ref<VmoMonacoDiffEditMode>('diff')
+const viewMode = ref<VmoMonacoViewMode>('edit')
 const previewSource = ref<VmoMonacoPreviewSource>('modified')
 const diffViewMode = ref<VmoMonacoDiffViewMode>('side-by-side')
 const editorOptions = ref<VmoMonacoEditorOption>({ theme: 'vs-light', language: 'plaintext', fontSize: 14 })
@@ -61,7 +86,7 @@ const fullScreen = ref(false)
 <template>
   <VmoMonacoDiffEditor ref="diffRef"
     v-model:original-value="original" v-model:modified-value="proposal"
-    v-model:display-mode="displayMode"
+    v-model:edit-mode="editMode" v-model:view-mode="viewMode"
     v-model:preview-source="previewSource"
     v-model:diff-view-mode="diffViewMode"
     v-model:monaco-options="editorOptions"
@@ -75,7 +100,7 @@ const fullScreen = ref(false)
 </template>
 ```
 
-`editorOptions` 中的 `theme`、`fontSize`、`language`、`lineNumbers` 和 `minimap.enabled` 随工具栏操作一起回传。普通编辑器同样支持 `v-model:monaco-options` 和 `v-model:full-screen`。不需要自动回写时，可以使用 `:display-mode="displayMode" @update:display-mode="handleMode($event)"` 等形式，仅接收通知。
+`editorOptions` 中的 `theme`、`fontSize`、`language`、`lineNumbers` 和 `minimap.enabled` 随工具栏操作一起回传。普通编辑器同样支持 `v-model:monaco-options` 和 `v-model:full-screen`。不需要自动回写时，可以使用 `:edit-mode="editMode" @update:edit-mode="handleMode($event)"` 等形式，仅接收通知。
 
 独立控件支持 `v-model:value`；语言和字号也支持 `v-model`（`modelValue` 别名）。显式值优先于别名和配置初始化内部状态，之后内部操作不等待父组件回写。外部值变化同步到目标编辑器，直接调用编辑器 API 的变化也会反映到控件。`config` 在 UI 容器中仍表示控件配置或可见性，不是编辑器状态绑定接口。
 

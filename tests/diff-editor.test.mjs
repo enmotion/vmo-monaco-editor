@@ -171,7 +171,7 @@ test('preview requires a slot, supports explicit source and handles slot removal
   delete slots.preview
   h.updateSlots()
   assert.equal(h.exposed.hasPreview.value, false)
-  assert.equal(h.exposed.currentDisplayMode.value, 'modified')
+  assert.equal(h.exposed.currentDisplayMode.value, 'original')
   await Vue.nextTick()
   h.cleanup()
 })
@@ -451,7 +451,7 @@ test('readonly status follows each view and props; optional settings and repeate
 test('diff editor v-model writeback settles without duplicate events and reflects later parent changes', async () => {
   const h = harness({ displayMode: 'original', previewSource: 'original' }, { preview() {} }, {
     onEvent([name, value], props) {
-      if (name.startsWith('update:')) props[name.slice(7)] = value
+      if (name.startsWith('update:') && !['update:viewMode', 'update:editMode'].includes(name)) props[name.slice(7)] = value
     }
   })
   await Vue.nextTick()
@@ -483,4 +483,35 @@ test('diff editor v-model writeback settles without duplicate events and reflect
   assert.equal(e.computedMonacoEditorOption.value.fontSize, 24)
   assert.equal(h.diff.options.ignoreTrimWhitespace, true)
   h.cleanup()
+})
+
+test('view and edit modes stay independent, honor new props and emit once with writeback', async () => {
+  const h = harness({ viewMode: 'preview', editMode: 'original', displayMode: 'diff' }, { preview() {} })
+  await Vue.nextTick()
+  const e = h.exposed
+  assert.equal(e.currentViewMode.value, 'preview')
+  assert.equal(e.currentEditMode.value, 'original')
+  e.changeEditMode('diff')
+  assert.equal(e.currentViewMode.value, 'preview')
+  e.changeViewMode('edit')
+  assert.equal(e.currentEditMode.value, 'diff')
+  h.props.editMode = 'modified'; h.props.viewMode = 'edit'; await Vue.nextTick()
+  assert.equal(e.currentEditMode.value, 'modified')
+  h.props.viewMode = 'preview'; await Vue.nextTick()
+  h.props.displayMode = 'original'; await Vue.nextTick()
+  assert.equal(e.currentEditMode.value, 'modified')
+  assert.equal(e.currentViewMode.value, 'preview')
+  h.props.editMode = undefined; h.props.viewMode = undefined; await Vue.nextTick()
+  h.props.displayMode = 'preview'; await Vue.nextTick()
+  h.cleanup()
+  const bound = harness({ viewMode: 'edit', editMode: 'diff' }, { preview() {} }, {
+    onEvent([name, value], props) { if (name === 'update:viewMode' || name === 'update:editMode') props[name.slice(7)] = value }
+  })
+  bound.exposed.changeViewMode('preview'); bound.exposed.changeEditMode('original')
+  await Vue.nextTick()
+  assert.equal(bound.props.viewMode, 'preview')
+  assert.equal(bound.props.editMode, 'original')
+  assert.equal(bound.events.filter(([n]) => n === 'update:viewMode').length, 1)
+  assert.equal(bound.events.filter(([n]) => n === 'update:editMode').length, 1)
+  bound.cleanup()
 })

@@ -1,12 +1,36 @@
 # 组件 API 完整参考
 
+## 独立的视图状态与内容状态
+
+两个编辑器都提供 `viewMode: 'edit' | 'preview'`，支持 `v-model:view-mode`、`update:viewMode` 与 `view-mode-change`。差异编辑器另提供 `editMode: 'original' | 'modified' | 'diff'`，支持 `v-model:edit-mode`、`update:editMode` 与 `edit-mode-change`。改变任一状态不会改变另一状态。`diffViewMode` 仅表示比对布局，`previewSource` 仅表示预览草稿来源。props 初始化内部状态，外部实际改变时同步；外部不回写则保留内部操作结果。
+
+两个编辑器的插槽一致：`default`、`prefix`、`preview`、`suffix`。preview 参数为 `{ content, language, source, theme }`，普通编辑器的 source 固定为 original。没有 preview 插槽时无法进入预览；移除插槽会返回 edit，保留差异编辑器的 editMode。普通编辑器切换时保留 Monaco 实例和草稿。
+
+差异编辑器的 `displayMode`、`currentDisplayMode`、`changeDisplayMode` 是已弃用的兼容接口；currentDisplayMode 是派生值：viewMode 为 preview 时返回 preview，否则返回 editMode。显式的新 props 对各自维度优先。新接入请分别绑定两个状态。
+
+```vue
+<VmoMonacoEditor v-model="body" v-model:view-mode="viewMode">
+  <template #preview="{ content, language, source, theme }">
+    <VmoPlainTextPreview :content="content" :theme="theme" />
+  </template>
+</VmoMonacoEditor>
+<VmoMonacoDiffEditor
+  v-model:original-value="body" v-model:modified-value="proposal"
+  v-model:view-mode="viewMode" v-model:edit-mode="editMode">
+  <template #preview="{ content, language, source, theme }">
+    <VmoPlainTextPreview :content="content" :theme="theme" />
+  </template>
+</VmoMonacoDiffEditor>
+```
+
+
 [English version](../en/guide/api)
 
 本文逐项对应当前源码导出的 15 个组件。所有 props 均可省略；模板中可使用 kebab-case。组件 ref 在挂载前为 `null`，表中的响应式状态在组件实例上已自动解包。方法未特别注明时返回 `void`。
 
 组件没有使用 `expose()` 限定实例：props 及 `setup()` 返回成员均可通过 ref 访问。下文列出全部返回成员；内部辅助成员仅解释用途，建议通过公开方法修改状态。Vue 自带的 `$el`、`$props` 等不属于库专有 API。
 
-类型简写：`Option` = `VmoMonacoEditorOption`，`Target` = `VmoMonacoControlTarget`，`Pair` = `{ originalValue: string; modifiedValue: string }`，`Mode` = `original | modified | diff | preview`，`ViewMode` = `side-by-side | inline`，`Source` = `original | modified`，`Theme` = `vs-dark | vs-light`。枚举值均为字符串。
+类型简写：`Option` = `VmoMonacoEditorOption`，`Target` = `VmoMonacoControlTarget`，`Pair` = `{ originalValue: string; modifiedValue: string }`，`Mode` = `original | modified | diff | preview`，`LayoutMode` = `side-by-side | inline`，`ViewMode` = `edit | preview`，`EditMode` = `original | modified | diff`，`Source` = `original | modified`，`Theme` = `vs-dark | vs-light`。枚举值均为字符串。
 
 ## VmoMonacoEditor
 
@@ -14,6 +38,7 @@
 
 | `属性` | 类型 | 默认值 | 说明 |
 | --- | --- | --- | --- |
+| `viewMode` | `'edit' \| 'preview'` | `'edit'` | 独立的编辑／预览状态，支持 `v-model:view-mode` |
 | `modelValue` | `string` | `'//code content gose here...'` | 编辑内容，支持 `v-model` |
 | `prefix` | `string` | `'(()=>{})'` | 编辑器上方展示内容，不进入 model |
 | `suffix` | `string` | `'};'` | 编辑器下方展示内容，不进入 model |
@@ -33,6 +58,7 @@
 
 | `事件` | 参数 | 触发时机 |
 | --- | --- | --- |
+| `update:viewMode` / `view-mode-change` | ViewMode | 编辑／预览状态实际变化 |
 | `update:modelValue` | `string` | 实时编辑或 `commit()` |
 | `update:monacoOptions` / `options-change` | `VmoMonacoEditorOption` | 控件或 API 实际改变内部配置，返回独立的配置快照 |
 | `update:fullScreen` / `fullscreen-change` | `boolean` | 全屏状态实际变化 |
@@ -44,6 +70,7 @@
 
 | `属性` | 类型 | 说明 |
 | --- | --- | --- |
+| `currentViewMode` | ViewMode | 当前编辑／预览状态 |
 | `computedMonacoEditorOption` | Option | 默认配置与内部配置合并后的当前配置 |
 | `currentReadOnly` | boolean | 当前只读状态，跟随 disabled 和 monacoOptions.readOnly |
 | `isFullScreen` | boolean | 当前全屏状态，由 `fullScreen` 初始化 |
@@ -54,6 +81,8 @@
 
 | `签名` | 说明 |
 | --- | --- |
+| `changeViewMode(mode: ViewMode)` | 只改变编辑／预览状态；preview 要求提供对应插槽 |
+| `togglePreview()` | 切换编辑／预览，保留 Monaco 实例与草稿 |
 | `insertCodeString(codeString: string)` | 在光标处插入，不替换选区；无光标时不执行 |
 | `resetMonacoEditorOptions(options: Option)` | 深度合并配置，后续通过 watcher 更新 Monaco |
 | `changeFullScreen(value: boolean)` | 设置全屏状态，实际变化时 emit 更新 |
@@ -83,6 +112,7 @@
 | `default` | 无 | 位于编辑器上方，可放工具栏；未提供时不渲染此区域 |
 | `prefix` | `{ option: VmoMonacoEditorOption }` | 替换上方附加内容；未提供插槽时用 `v-html` 渲染 prefix prop。插槽存在或 prefix 非空时渲染 |
 | `suffix` | `{ option: VmoMonacoEditorOption }` | 替换下方附加内容；未提供插槽时用 `v-html` 渲染 suffix prop。插槽存在或 suffix 非空时渲染 |
+| `preview` | `{ content: string; language: string; source: 'original'; theme: Theme }` | 当前草稿，仅在 preview 状态渲染，无内置渲染器。 |
 
 `option` 是合并默认值后的当前配置，随状态更新。prefix／suffix 不是 Monaco model 内容；插槽不会得到草稿或提交方法。普通文本可用 Vue 插值，HTML prop 只应传入可信内容。
 
@@ -104,10 +134,12 @@
 
 | `属性` | 类型 | 默认值 | 说明 |
 | --- | --- | --- | --- |
+| `viewMode` | `'edit' \| 'preview'` | `'edit'` | 独立的编辑／预览状态，支持 `v-model:view-mode` |
 | `originalValue` | `string` | `''` | `v-model:original-value` |
 | `modifiedValue` | `string` | `''` | `v-model:modified-value` |
 | `prefix` / `suffix` | `string` | `''` | model 外的展示内容 |
-| `displayMode` | `'original' \| 'modified' \| 'diff' \| 'preview'` | `'diff'` | 当前显示模式 |
+| `editMode` | `'original' \| 'modified' \| 'diff'` | `'diff'` | 独立的编辑内容选择，支持 `v-model:edit-mode` |
+| `displayMode` | `'original' \| 'modified' \| 'diff' \| 'preview'` | `'diff'` | 已弃用的兼容显示模式；新 props 对各自维度优先 |
 | `previewSource` | `'original' \| 'modified'` | 未设置 | 指定预览来源 |
 | `diffViewMode` | `'side-by-side' \| 'inline'` | `'side-by-side'` | 差异布局 |
 | `editableOriginal` | `boolean` | `false` | 允许编辑原文 |
@@ -129,6 +161,8 @@
 
 | `事件` | 参数 | 说明 |
 | --- | --- | --- |
+| `update:viewMode` / `view-mode-change` | ViewMode | 编辑／预览状态实际变化 |
+| `update:editMode` / `edit-mode-change` | EditMode | 内容选择实际变化，预览中也可独立改变 |
 | `update:displayMode` / `mode-change` | 显示模式字符串 | 显示模式实际变化 |
 | `update:previewSource` / `preview-source-change` | `'original' \| 'modified'` | 预览来源实际变化 |
 | `update:diffViewMode` / `diff-view-mode-change` | `'side-by-side' \| 'inline'` | 比对布局实际变化 |
@@ -147,11 +181,13 @@
 
 | `属性` | 类型 | 说明 |
 | --- | --- | --- |
+| `currentViewMode` | ViewMode | 当前编辑／预览状态 |
+| `currentEditMode` | EditMode | 当前正文／提案／比对选择 |
 | `computedMonacoEditorOption` | Option | 默认配置与内部配置合并后的当前配置 |
 | `isFullScreen` | boolean | 当前全屏状态，由 `fullScreen` 初始化 |
 | `currentReadOnly` | boolean | 当前视图是否只读 |
 | `currentDisplayMode` | Mode | 当前实际模式，可能因缺少预览插槽而回退 |
-| `currentDiffViewMode` | ViewMode | 当前并排/内联布局 |
+| `currentDiffViewMode` | LayoutMode | 当前并排/内联布局 |
 | `hasPreview` | boolean | 是否存在 preview 插槽 |
 | `currentPreviewSource` | Source | 当前预览来源 |
 | `modifiedInnerValue` | string | 内部提案草稿；原文缓存 originalInnerValue 未返回，不可直接访问 |
@@ -174,10 +210,12 @@
 | `refreshMonacoEditor()` | 重建 editor；模型保留规则见使用指南 |
 | `commit()` | 提交内部值；普通编辑器发出 update:modelValue 和 change，diff 等同 confirm |
 | `resetMonacoDiffEditorOptions(options: Partial<Monaco.editor.IStandaloneDiffEditorConstructionOptions>)` | 深度合并 diff 选项；布局和编辑权限仍由专用 props/状态控制 |
-| `changeDisplayMode(mode: Mode)` | 切换视图；preview 要求提供插槽；实际变化时发出 update:displayMode 与 mode-change |
-| `changeDiffViewMode(mode: ViewMode)` | 切换 diff 布局，不发出编辑器级布局事件 |
-| `changePreviewSource(source: Source)` | 切换预览来源；实际变化时发出 update:previewSource 与 preview-source-change |
+| `changeViewMode(mode: ViewMode)` | 只改变编辑／预览状态；preview 要求提供对应插槽 |
+| `changeEditMode(mode: EditMode)` | 只改变内容选择，不退出预览 |
 | `togglePreview()` | 进入预览或返回此前编辑模式；无插槽时不进入 |
+| `changeDisplayMode(mode: Mode)` | 切换视图；preview 要求提供插槽；实际变化时发出 update:displayMode 与 mode-change |
+| `changeDiffViewMode(mode: LayoutMode)` | 切换 diff 布局，不发出编辑器级布局事件 |
+| `changePreviewSource(source: Source)` | 切换预览来源；实际变化时发出 update:previewSource 与 preview-source-change |
 | `acceptChange(index: number)` | 接受当前差异块，零基索引；结果无效时不执行 |
 | `rejectChange(index: number)` | 拒绝当前差异块，零基索引；结果无效时不执行 |
 | `acceptAllChanges()` | 完整复制 modified 到 original，不检查 diffPending |
@@ -209,11 +247,11 @@
 | `default` | 无 | 位于编辑器上方，可放工具栏；未提供时不渲染此区域 |
 | `prefix` | `{ option: VmoMonacoEditorOption }` | 替换上方附加内容；未提供插槽时用 `v-html` 渲染 prefix prop。插槽存在或 prefix 非空时渲染 |
 | `suffix` | `{ option: VmoMonacoEditorOption }` | 替换下方附加内容；未提供插槽时用 `v-html` 渲染 suffix prop。插槽存在或 suffix 非空时渲染 |
-| `preview` | `{ content: string; language: string; source: Source; theme: Theme }` | 仅在 currentDisplayMode 为 preview 时渲染；提供此插槽才有预览能力，无内置正文渲染器 |
+| `preview` | `{ content: string; language: string; source: Source; theme: Theme }` | 仅在 currentViewMode 为 preview 时渲染；提供此插槽才有预览能力，无内置正文渲染器 |
 
 `option` 是合并默认值后的当前配置，随状态更新。prefix／suffix 不是 Monaco model 内容；插槽不会得到草稿或提交方法。普通文本可用 Vue 插值，HTML prop 只应传入可信内容。
 
-`content` 是 source 选中一侧的内部草稿，包括未提交修改；`language` 是当前编辑器语言，缺省回退 plaintext；`source` 为 original／modified；`theme` 是当前编辑器主题。插槽替换预览内容区域，不替换外层预览容器或来源按钮（提案非空时显示来源按钮）。不提供插槽时不能进入预览，初始 preview 回退到 modified，移除插槽也会退出预览。
+`content` 是 source 选中一侧的内部草稿，包括未提交修改；`language` 是当前编辑器语言，缺省回退 plaintext；`source` 为 original／modified；`theme` 是当前编辑器主题。插槽替换预览内容区域，不替换外层预览容器或来源按钮（提案非空时显示来源按钮）。不提供插槽时不能进入预览，没有插槽时 viewMode 回退到 edit，保留 editMode，移除插槽也会退出预览。
 
 ```vue
 <VmoMonacoDiffEditor :original-value="original" :modified-value="proposal" style="height: 500px">
@@ -264,7 +302,7 @@
 
 ### Emits 与实例方法
 
-没有自定义 emit。内部控件的交互事件不会由 UI 自动转发；需要监听时使用自定义默认插槽中的控件。编辑器状态变化则直接监听编辑器自身的 `update:*` 事件。`changeContentMode(mode)` 支持 original／modified／diff：预览中正文／提案只改变来源，比对退出预览；其它模式切换内容视图，作用于全部差异目标。
+没有自定义 emit。内部控件的交互事件不会由 UI 自动转发；需要监听时使用自定义默认插槽中的控件。编辑器状态变化则直接监听编辑器自身的 `update:*` 事件。`changeContentMode(mode)` 支持 original／modified／diff：始终只改变 editMode，不退出预览；previewSource 单独控制预览来源，作用于全部差异目标。
 
 ### 实例属性
 
@@ -309,7 +347,7 @@
 | `acceptAllChanges` | `() => void` | 接受全部修改 |
 | `rejectAllChanges` | `() => void` | 拒绝全部修改 |
 | `changeDisplayMode` | `(mode: Mode) => void` | 切换显示模式；preview 仅应用于有预览能力的目标 |
-| `changeDiffViewMode` | `(mode: ViewMode) => void` | 切换并排／行内布局 |
+| `changeDiffViewMode` | `(mode: LayoutMode) => void` | 切换并排／行内布局 |
 | `confirm` | `() => void` | 确认当前内容 |
 
 参数以 camelCase 解构，尽管模板绑定写为 kebab-case。插槽不提供 `canReview`、`currentDiffViewMode` 或 `closePanel`；可用 `diffPending || !lineChanges.length` 判断批量按钮是否应禁用。方法本身不检查此禁用条件。
@@ -622,7 +660,7 @@
 
 | `属性` | 类型 | 说明 |
 | --- | --- | --- |
-| `previewMonacos` | VmoMonacoDiffEditorExpose[] | 过滤出有预览插槽和预览方法的目标 |
+| `previewMonacos` | VmoMonacoEditorExpose[] | 过滤出有预览插槽和预览方法的目标 |
 | `currentValue` | boolean | 当前内部预览状态；由 value 初始化，跟随外部更新和目标状态变化 |
 
 
@@ -701,7 +739,7 @@ type ReviewControlPayload = {
 | `canReview` | boolean | 非计算中且有差异；默认批量按钮使用 |
 | `currentDisplayMode` | Mode | 首个目标模式，回退 diff |
 | `hasPreview` | boolean | 首个目标是否有预览插槽，回退 false |
-| `currentDiffViewMode` | ViewMode | 首个目标布局，回退 side-by-side |
+| `currentDiffViewMode` | LayoutMode | 首个目标布局，回退 side-by-side |
 
 
 ### 实例方法
@@ -715,7 +753,7 @@ type ReviewControlPayload = {
 | `rejectAllChanges()` | 对所有有效目标调用全部拒绝 |
 | `confirm()` | 对所有有效目标确认 |
 | `changeDisplayMode(mode: Mode)` | 同步显示模式 |
-| `changeDiffViewMode(mode: ViewMode)` | 同步 diff 布局 |
+| `changeDiffViewMode(mode: LayoutMode)` | 同步 diff 布局 |
 
 这些方法本身不检查 `canReview`；自定义菜单应自行禁用不适用的操作。`closePanel` 和目标列表没有返回到组件实例。默认插槽提供 `lineChanges`、`diffPending`、`currentDisplayMode`、`hasPreview` 以及上述审阅/模式方法（不含 togglePanel）；UI 的 `review-actions` 插槽转发同一组参数。
 
@@ -737,7 +775,7 @@ type ReviewControlPayload = {
 | `acceptAllChanges` | `() => void` | 接受全部修改 |
 | `rejectAllChanges` | `() => void` | 拒绝全部修改 |
 | `changeDisplayMode` | `(mode: Mode) => void` | 切换显示模式；preview 仅应用于有预览能力的目标 |
-| `changeDiffViewMode` | `(mode: ViewMode) => void` | 切换并排／行内布局 |
+| `changeDiffViewMode` | `(mode: LayoutMode) => void` | 切换并排／行内布局 |
 | `confirm` | `() => void` | 确认当前内容 |
 
 参数以 camelCase 解构，尽管模板绑定写为 kebab-case。插槽不提供 `canReview`、`currentDiffViewMode` 或 `closePanel`；可用 `diffPending || !lineChanges.length` 判断批量按钮是否应禁用。方法本身不检查此禁用条件。

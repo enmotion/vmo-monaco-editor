@@ -40,7 +40,8 @@ import type {
   VmoMonacoDiffChangePayload,
   VmoMonacoDiffConfirmPayload,
   VmoMonacoDiffReviewActionPayload,
-  VmoMonacoDiffDisplayMode,
+  VmoMonacoDiffEditMode,
+  VmoMonacoViewMode,
   VmoMonacoDiffViewMode,
   VmoMonacoControlTarget
 } from 'vmo-monaco-editor'

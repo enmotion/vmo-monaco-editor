@@ -194,7 +194,10 @@ export default defineComponent({
     }
 
     function changeDisplayMode(mode: VmoMonacoDiffEditorExpose['currentDisplayMode']) {
-      diffMonacos.value.filter(monaco => mode != 'preview' || monaco.hasPreview).forEach(monaco => monaco.changeDisplayMode(mode))
+      diffMonacos.value.filter(monaco => mode != 'preview' || monaco.hasPreview).forEach(monaco => {
+        if (mode !== 'preview' && typeof monaco.changeEditMode === 'function') monaco.changeEditMode(mode)
+        else monaco.changeDisplayMode(mode)
+      })
       context.emit('display-mode-change', createPayload('display-mode-change', undefined, { mode }))
     }
 

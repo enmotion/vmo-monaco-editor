@@ -250,3 +250,13 @@ test('fullscreen props and internal actions set the actual target state', () => 
   assert.equal(events.filter(([e]) => e === 'update:value').length, 2)
   scope.stop()
 })
+
+test('review content action preserves preview on split-mode targets', () => {
+  const target = { acceptAllChanges() {}, getLineChanges: () => [], currentViewMode: 'preview', currentDisplayMode: 'preview',
+    changeEditMode(mode) { this.currentEditMode = mode }, changeDisplayMode(mode) { this.currentDisplayMode = mode } }
+  const load = createLibraryLoader({ vue: { ...Vue, inject: () => Vue.ref(target) } })
+  const control = load('components/vmo-monaco-ui/controls/diff-review.vue').default.setup({}, { emit() {} })
+  control.changeDisplayMode('original')
+  assert.equal(target.currentEditMode, 'original')
+  assert.equal(target.currentViewMode, 'preview')
+})

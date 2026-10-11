@@ -103,6 +103,8 @@ import type {
   VmoMonacoAnyDiffEditor,
   VmoMonacoDiffChangePayload,
   VmoMonacoDiffConfirmPayload,
+  VmoMonacoViewMode,
+  VmoMonacoDiffEditMode,
   VmoMonacoDiffDisplayMode,
   VmoMonacoDiffEditor,
   VmoMonacoDiffReviewActionPayload,
@@ -120,6 +122,8 @@ const DEFAULT_MODIFIED_URI = 'vmo-monaco-diff-modified'
 export type {
   VmoMonacoDiffChangePayload,
   VmoMonacoDiffConfirmPayload,
+  VmoMonacoViewMode,
+  VmoMonacoDiffEditMode,
   VmoMonacoDiffDisplayMode,
   VmoMonacoDiffReviewActionPayload,
   VmoMonacoDiffViewMode
@@ -145,6 +149,15 @@ export default defineComponent({
       type: String as PropType<string>,
       default: ''
     },
+    viewMode: {
+      type: String as PropType<VmoMonacoViewMode>,
+      default: undefined
+    },
+    editMode: {
+      type: String as PropType<VmoMonacoDiffEditMode>,
+      default: undefined
+    },
+    // Compatibility input only; actual state is split into viewMode and editMode.
     displayMode: {
       type: String as PropType<VmoMonacoDiffDisplayMode>,
       default: 'diff'
@@ -209,6 +222,10 @@ export default defineComponent({
     }
   },
   emits: [
+    'update:viewMode',
+    'view-mode-change',
+    'update:editMode',
+    'edit-mode-change',
     'update:displayMode',
     'update:previewSource',
     'update:diffViewMode',
@@ -250,10 +267,14 @@ export default defineComponent({
     // displayMode 控制只看确认稿、只看候选稿、或进入 diff 审阅。
     // diffViewMode 只影响 diff 模式下的并排/混合渲染。
     const hasPreview = ref(!!context.slots?.preview)
-    const currentDisplayMode = ref(props.displayMode == 'preview' && !hasPreview.value ? 'modified' : props.displayMode)
-    let previousEditorMode: Exclude<VmoMonacoDiffDisplayMode, 'preview'> = props.displayMode == 'preview'
-      ? props.previewSource || 'modified' : props.displayMode
-    const currentPreviewSource = ref<VmoMonacoPreviewSource>(props.previewSource || (props.displayMode == 'original' ? 'original' : 'modified'))
+    const currentEditMode = ref<VmoMonacoDiffEditMode>(props.editMode ??
+      (props.displayMode === 'preview' ? props.previewSource || 'modified' : props.displayMode))
+    const currentViewMode = ref<VmoMonacoViewMode>(
+      (props.viewMode ?? (props.displayMode === 'preview' ? 'preview' : 'edit')) === 'preview' && hasPreview.value ? 'preview' : 'edit')
+    // Read-only legacy projection, never an independent state source.
+    const currentDisplayMode = computed<VmoMonacoDiffDisplayMode>(() =>
+      currentViewMode.value === 'preview' ? 'preview' : currentEditMode.value)
+    const currentPreviewSource = ref<VmoMonacoPreviewSource>(props.previewSource || (currentEditMode.value == 'original' ? 'original' : 'modified'))
     const currentDiffViewMode = ref(props.diffViewMode)
 
     // ===== 审阅状态 =====
@@ -350,10 +371,14 @@ export default defineComponent({
       },
       { deep: true }
     )
+    watch(() => props.viewMode, mode => { if (mode !== undefined) changeViewMode(mode) })
+    watch(() => props.editMode, mode => { if (mode !== undefined) changeEditMode(mode) })
     watch(
       () => props.displayMode,
       mode => {
-        changeDisplayMode(mode)
+        // New props own their respective dimensions when both interfaces are supplied.
+        if (props.editMode === undefined && mode !== 'preview') changeEditMode(mode)
+        if (props.viewMode === undefined) changeViewMode(mode === 'preview' ? 'preview' : 'edit')
       }
     )
     watch(
@@ -384,7 +409,7 @@ export default defineComponent({
     })
     onBeforeUpdate(() => {
       hasPreview.value = !!context.slots?.preview
-      if (!hasPreview.value && currentDisplayMode.value == 'preview') changeDisplayMode('modified')
+      if (!hasPreview.value && currentViewMode.value == 'preview') changeViewMode('edit')
     })
 
     // 初始化时先创建两个稳定 model，再根据 displayMode 创建对应 editor view。
@@ -798,22 +823,47 @@ export default defineComponent({
       }
     }
 
+    function emitLegacyMode(previous: VmoMonacoDiffDisplayMode) {
+      if (previous === currentDisplayMode.value) return
+      context.emit('update:displayMode', currentDisplayMode.value)
+      context.emit('mode-change', currentDisplayMode.value)
+    }
+
+    function changeViewMode(mode: VmoMonacoViewMode) {
+      if (mode === 'preview' && !hasPreview.value) return
+      if (mode === currentViewMode.value) return
+      const previous = currentDisplayMode.value
+      if (mode === 'preview' && props.previewSource === undefined) {
+        changePreviewSource(currentEditMode.value === 'original' ? 'original' : 'modified')
+      }
+      currentViewMode.value = mode
+      refreshMonacoEditor()
+      context.emit('update:viewMode', mode)
+      context.emit('view-mode-change', mode)
+      emitLegacyMode(previous)
+    }
+
+    function changeEditMode(mode: VmoMonacoDiffEditMode) {
+      if (mode === currentEditMode.value) return
+      const previous = currentDisplayMode.value
+      currentEditMode.value = mode
+      if (currentViewMode.value === 'edit') refreshMonacoEditor()
+      context.emit('update:editMode', mode)
+      context.emit('edit-mode-change', mode)
+      emitLegacyMode(previous)
+    }
+
+    /** @deprecated Compatibility command; edit values also return to edit view. */
     function changeDisplayMode(mode: VmoMonacoDiffDisplayMode) {
-      if (mode == 'preview' && !hasPreview.value) return
-      if (mode != currentDisplayMode.value) {
-        if (mode == 'preview') {
-          previousEditorMode = currentDisplayMode.value as Exclude<VmoMonacoDiffDisplayMode, 'preview'>
-          changePreviewSource(props.previewSource !== undefined ? currentPreviewSource.value : (currentDisplayMode.value == 'original' ? 'original' : 'modified'))
-        }
-        currentDisplayMode.value = mode
-        refreshMonacoEditor()
-        context.emit('update:displayMode', mode)
-        context.emit('mode-change', mode)
+      if (mode === 'preview') changeViewMode('preview')
+      else {
+        changeEditMode(mode)
+        changeViewMode('edit')
       }
     }
 
     function togglePreview() {
-      changeDisplayMode(currentDisplayMode.value == 'preview' ? previousEditorMode : 'preview')
+      changeViewMode(currentViewMode.value === 'preview' ? 'edit' : 'preview')
     }
 
     function changeDiffViewMode(mode: VmoMonacoDiffViewMode) {
@@ -854,6 +904,8 @@ export default defineComponent({
       computedMonacoEditorOption,
       monacoEditorOptions,
       mergeDeepRight,
+      currentViewMode,
+      currentEditMode,
       currentDisplayMode,
       currentReadOnly,
       hasPreview,
@@ -878,6 +930,8 @@ export default defineComponent({
       acceptAllChanges,
       rejectAllChanges,
       changeLanguage,
+      changeViewMode,
+      changeEditMode,
       changeDisplayMode,
       togglePreview,
       changeDiffViewMode,

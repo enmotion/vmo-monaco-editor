@@ -7,7 +7,7 @@ import * as Vue from 'vue'
 import * as Ramda from 'ramda'
 
 function harness(initialProps = {}, behavior = {}) {
-  const editors = [], providers = [], events = [], mounted = []
+  const editors = [], providers = [], events = [], mounted = [], beforeUpdate = []
   const Monaco = {
     Range: class { constructor(sl, sc, el, ec) { Object.assign(this, { sl, sc, el, ec }) } },
     editor: {
@@ -38,7 +38,7 @@ function harness(initialProps = {}, behavior = {}) {
   }
   const source = fs.readFileSync(new URL('../components/vmo-monaco-editor/vmo-monaco-editor.vue', import.meta.url), 'utf8').match(/<script lang="ts">([\s\S]*?)<\/script>/)[1]
   const context = { exports: {}, require(name) {
-    if (name === 'vue') return behavior.deferMount ? { ...Vue, onMounted: fn => mounted.push(fn) } : Vue
+    if (name === 'vue') return { ...Vue, onBeforeUpdate: fn => beforeUpdate.push(fn), ...(behavior.deferMount ? { onMounted: fn => mounted.push(fn) } : {}) }
     if (name === 'ramda') return Ramda
     if (name.endsWith('/sync-monaco-options')) {
       const helper = { exports: {}, require: () => Ramda }
@@ -60,15 +60,17 @@ function harness(initialProps = {}, behavior = {}) {
   })
   const props = Vue.reactive(initialProps), editorRef = Vue.ref()
   const app = renderer.createApp({ render: () => Vue.h(component, { ...props, ref: editorRef,
+    'onUpdate:viewMode': value => { events.push(['update:viewMode', value]); if (behavior.bindState) props.viewMode = value },
+    onViewModeChange: value => events.push(['view-mode-change', value]),
     'onUpdate:modelValue': value => events.push(['update:modelValue', value]),
     'onUpdate:monacoOptions': value => { events.push(['update:monacoOptions', value]); if (behavior.bindState) props.monacoOptions = value },
     onOptionsChange: value => events.push(['options-change', value]),
     'onUpdate:fullScreen': value => { events.push(['update:fullScreen', value]); if (behavior.bindState) props.fullScreen = value },
     onFullscreenChange: value => events.push(['fullscreen-change', value]),
     onChange: value => events.push(['change', value]), onFocuse: () => events.push(['focuse']), onBlur: () => events.push(['blur'])
-  }) })
+  }, behavior.slots || {}) })
   app.mount({})
-  return { app, props, editorRef, editors, providers, events, mountEditor: () => mounted.forEach(fn => fn()) }
+  return { updateSlots: () => beforeUpdate.forEach(fn => fn()), app, props, editorRef, editors, providers, events, mountEditor: () => mounted.forEach(fn => fn()) }
 }
 
 test('refresh rebinds completion; unmount disposes models and pending registration', async () => {
@@ -272,4 +274,39 @@ test('ordinary editor readonly status and Monaco options follow disabled and rea
   await Vue.nextTick()
   assert.equal(h.editorRef.value.currentReadOnly, false)
   h.app.unmount()
+})
+
+test('ordinary preview preserves the draft and editor and synchronizes independent view props', async () => {
+  const slots = { preview() {} }
+  const h = harness({ modelValue: 'draft', viewMode: 'preview' }, { slots })
+  await Vue.nextTick()
+  const e = h.editorRef.value
+  assert.equal(e.currentViewMode, 'preview')
+  assert.equal(e.previewContent, 'draft')
+  assert.equal(e.currentPreviewSource, 'original')
+  assert.equal(e.previewLanguage, 'typescript')
+  e.changeViewMode('preview')
+  e.togglePreview(); e.togglePreview()
+  assert.equal(e.currentViewMode, 'preview')
+  assert.equal(h.editors.length, 1)
+  h.editors[0].setValue('uncommitted')
+  assert.equal(e.previewContent, 'uncommitted')
+  h.props.viewMode = 'edit'; await Vue.nextTick()
+  assert.equal(e.currentViewMode, 'edit')
+  h.props.viewMode = 'preview'; await Vue.nextTick()
+  delete slots.preview; h.props.prefix = 'rerender'; await Vue.nextTick(); h.updateSlots()
+  assert.equal(e.currentViewMode, 'edit')
+  assert.equal(e.hasPreview, false)
+  e.changeViewMode('preview')
+  e.resetMonacoEditorOptions({ language: undefined })
+  assert.equal(e.previewLanguage, 'plaintext')
+  h.app.unmount()
+  const noSlot = harness({ viewMode: 'preview' })
+  assert.equal(noSlot.editorRef.value.currentViewMode, 'edit')
+  noSlot.updateSlots(); noSlot.app.unmount()
+  const bound = harness({ viewMode: 'edit' }, { slots: { preview() {} }, bindState: true })
+  bound.editorRef.value.togglePreview(); await Vue.nextTick()
+  assert.equal(bound.props.viewMode, 'preview')
+  assert.equal(bound.events.filter(([n]) => n === 'update:viewMode').length, 1)
+  bound.app.unmount()
 })

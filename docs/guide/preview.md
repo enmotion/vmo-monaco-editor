@@ -1,5 +1,29 @@
 # 预览组件
 
+## 独立的视图状态与内容状态
+
+两个编辑器都提供 `viewMode: 'edit' | 'preview'`，支持 `v-model:view-mode`、`update:viewMode` 与 `view-mode-change`。差异编辑器另提供 `editMode: 'original' | 'modified' | 'diff'`，支持 `v-model:edit-mode`、`update:editMode` 与 `edit-mode-change`。改变任一状态不会改变另一状态。`diffViewMode` 仅表示比对布局，`previewSource` 仅表示预览草稿来源。props 初始化内部状态，外部实际改变时同步；外部不回写则保留内部操作结果。
+
+两个编辑器的插槽一致：`default`、`prefix`、`preview`、`suffix`。preview 参数为 `{ content, language, source, theme }`，普通编辑器的 source 固定为 original。没有 preview 插槽时无法进入预览；移除插槽会返回 edit，保留差异编辑器的 editMode。普通编辑器切换时保留 Monaco 实例和草稿。
+
+差异编辑器的 `displayMode`、`currentDisplayMode`、`changeDisplayMode` 是已弃用的兼容接口；currentDisplayMode 是派生值：viewMode 为 preview 时返回 preview，否则返回 editMode。显式的新 props 对各自维度优先。新接入请分别绑定两个状态。
+
+```vue
+<VmoMonacoEditor v-model="body" v-model:view-mode="viewMode">
+  <template #preview="{ content, language, source, theme }">
+    <VmoPlainTextPreview :content="content" :theme="theme" />
+  </template>
+</VmoMonacoEditor>
+<VmoMonacoDiffEditor
+  v-model:original-value="body" v-model:modified-value="proposal"
+  v-model:view-mode="viewMode" v-model:edit-mode="editMode">
+  <template #preview="{ content, language, source, theme }">
+    <VmoPlainTextPreview :content="content" :theme="theme" />
+  </template>
+</VmoMonacoDiffEditor>
+```
+
+
 props、emit 与完整实例成员清单见[组件 API 完整参考](./api)。
 
 三个独立预览组件可单独使用，也可放进差异编辑器的 `#preview` 插槽：`VmoTextPreview` 展示文本，`VmoCodePreview` 使用只读 Monaco，`VmoMarkdownPreview` 渲染 Markdown。
@@ -75,17 +99,17 @@ const diffRef = ref()
 
 插槽参数：`content` 是内部当前草稿，包含未提交编辑；`language` 是当前语言；`source` 为 `original` 或 `modified`；`theme` 为当前主题。预览不会提交内容或替换两个 model。
 
-未显式指定 `previewSource` 时，从正文进入预览默认显示正文；从提案／比对进入默认显示提案。显式 `previewSource` 初始化来源，并在外部实际变化时同步；外部值不变时，内部来源切换会保留，包括再次进入预览。状态行和预览来源按钮都可切换正文／提案且不退出预览；点击状态行的比对会退出预览。
+未显式指定 `previewSource` 时，从正文进入预览默认显示正文；从提案／比对进入默认显示提案。显式 `previewSource` 初始化来源，并在外部实际变化时同步；外部值不变时，内部来源切换会保留，包括再次进入预览。状态行仅改变 editMode；预览来源按钮独立改变 previewSource，均不退出预览。
 
-用 `v-model:display-mode` 与 `v-model:preview-source` 双向绑定，或用 `@update:display-mode="handleMode($event)"`、`@update:preview-source="handleSource($event)"` 仅接收通知。原有 `mode-change`、`preview-source-change` 保留。`needConfirm` 和 `bidibind` 不延迟这些状态更新。预览本身不提供编辑输入；`currentReadOnly` 描述编辑器视图的编辑限制。
+用 `v-model:view-mode` 与 `v-model:preview-source` 双向绑定，或用 `@update:view-mode="handleMode($event)"`、`@update:preview-source="handleSource($event)"` 仅接收通知。原有 `mode-change`、`preview-source-change` 保留。`needConfirm` 和 `bidibind` 不延迟这些状态更新。预览本身不提供编辑输入；`currentReadOnly` 描述编辑器视图的编辑限制。
 
 自定义 `VmoMonacoUi` 默认插槽只替换上方控件，状态行及预览开关仍保留；`preview: false` 隐藏状态行预览开关。完全自建工具栏时可使用独立的 `VmoMonacoPreviewToggle`。
 
-没有预览插槽时开关隐藏，初始 `displayMode="preview"` 回退到提案；移除插槽也会退出预览。
+没有预览插槽时开关隐藏，初始 `viewMode="preview"` 回退到 edit；移除插槽也会退出预览并保留 editMode。
 
 ```ts
 diffRef.value.togglePreview() // 再次切换回此前编辑视图
-diffRef.value.changeDisplayMode('preview')
+diffRef.value.changeViewMode('preview')
 diffRef.value.changePreviewSource('original')
 // 状态：hasPreview、currentPreviewSource
 ```

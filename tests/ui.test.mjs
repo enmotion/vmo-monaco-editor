@@ -70,3 +70,17 @@ test('toolbar separates preview source from editor view and reflects current set
   assert.equal(ui.interactionLabel.value, '只读')
   assert.equal(ui.editorOption.value.language, 'sql')
 })
+
+test('toolbar changes editMode independently while both editor kinds display preview status', () => {
+  const component = createLibraryLoader({ vue: { ...Vue, provide() {} } })('components/vmo-monaco-ui/vmo-monaco-ui.vue').default
+  const target = Vue.reactive({ currentViewMode: 'preview', currentEditMode: 'diff', currentDisplayMode: 'preview',
+    changeDisplayMode() {}, changeEditMode(mode) { this.currentEditMode = mode } })
+  const ui = component.setup(Vue.reactive({ monaco: target, config: {} }), {})
+  ui.changeContentMode('original')
+  assert.equal(ui.currentContentMode.value, 'original')
+  assert.equal(ui.interactionLabel.value, '预览')
+  target.currentViewMode = 'edit'; target.currentDisplayMode = 'original'
+  assert.equal(ui.isPreview.value, false)
+  const ordinary = component.setup({ monaco: { currentViewMode: 'preview' }, config: {} }, {})
+  assert.equal(ordinary.interactionLabel.value, '预览')
+})

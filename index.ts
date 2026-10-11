@@ -1,3 +1,4 @@
+export type { VmoMonacoViewMode, VmoMonacoDiffEditMode } from '@comps/vmo-monaco-diff-editor/types'
 import VmoMonacoPreviewToggle from '@comps/vmo-monaco-ui/controls/preview-toggle.vue'
 export type { VmoMonacoPreviewControlValue, VmoMonacoPreviewControlConfig } from '@comps/vmo-monaco-ui/controls/preview-toggle.vue'
 export type { VmoMonacoPreviewSource } from '@comps/vmo-monaco-diff-editor/types'

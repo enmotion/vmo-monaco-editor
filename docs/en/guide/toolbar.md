@@ -1,5 +1,29 @@
 # Toolbar & controls
 
+## Independent view and content state
+
+Both editors expose `viewMode: 'edit' | 'preview'` through `v-model:view-mode`, `update:viewMode` and `view-mode-change`. The diff editor additionally exposes `editMode: 'original' | 'modified' | 'diff'` through `v-model:edit-mode`, `update:editMode` and `edit-mode-change`. Changing one never changes the other. `diffViewMode` only selects the comparison layout; `previewSource` only selects the preview draft. Props initialize state and real parent changes synchronize it; without writeback local changes persist.
+
+Both editors provide the same `default`, `prefix`, `preview`, and `suffix` slots. The preview payload is `{ content, language, source, theme }`; the ordinary editor's source is always `original`. Preview requires a preview slot. Removing it returns to `edit` while retaining the diff editor's `editMode`. The ordinary editor preserves its Monaco instance and draft across view changes.
+
+`displayMode`, `currentDisplayMode`, and `changeDisplayMode` are deprecated compatibility interfaces on the diff editor. The current value is a derived projection: preview when viewMode is preview, otherwise editMode. Explicit new props take priority for their own dimension. New integrations should bind the separate states.
+
+```vue
+<VmoMonacoEditor v-model="body" v-model:view-mode="viewMode">
+  <template #preview="{ content, language, source, theme }">
+    <VmoPlainTextPreview :content="content" :theme="theme" />
+  </template>
+</VmoMonacoEditor>
+<VmoMonacoDiffEditor
+  v-model:original-value="body" v-model:modified-value="proposal"
+  v-model:view-mode="viewMode" v-model:edit-mode="editMode">
+  <template #preview="{ content, language, source, theme }">
+    <VmoPlainTextPreview :content="content" :theme="theme" />
+  </template>
+</VmoMonacoDiffEditor>
+```
+
+
 See the [complete component API reference](./api) for all props, emits, instance properties and methods.
 
 
@@ -38,20 +62,21 @@ If `monaco` is an array, option controls apply to all targets; fullscreen switch
 
 ## State bindings
 
-With an attached editor, the persistent second row separates content (original, proposal, diff) from interaction mode (edit, readonly, preview), and displays current language, font size, theme and pending confirmation. Diff shows side-by-side or inline layout, and preview highlights its actual source. Preview content switches preserve preview; selecting diff returns to the editor. The preview toggle reads “返回编辑器” (return to editor) while active and restores the previous editor view. Current language, font size in px and theme remain visible even when their setting controls are hidden. A custom default slot replaces the upper controls while retaining this status row; `preview: false` hides the status-row preview toggle.
+With an attached editor, the persistent second row separates content (original, proposal, diff) from interaction mode (edit, readonly, preview), and displays current language, font size, theme and pending confirmation. Diff shows side-by-side or inline layout, and preview highlights its actual source. Content switches only change editMode and preserve preview; previewSource selects the previewed draft separately. The preview toggle reads “返回编辑器” (return to editor) while active and restores the previous editor view. Current language, font size in px and theme remain visible even when their setting controls are hidden. A custom default slot replaces the upper controls while retaining this status row; `preview: false` hides the status-row preview toggle.
 
 ```vue
 <script setup lang="ts">
 import { ref } from 'vue'
 import { VmoMonacoDiffEditor, VmoMonacoUi, VmoTextPreview } from 'vmo-monaco-editor'
-import type { VmoMonacoDiffDisplayMode, VmoMonacoDiffViewMode, VmoMonacoPreviewSource, VmoMonacoEditorOption } from 'vmo-monaco-editor'
+import type { VmoMonacoDiffEditMode, VmoMonacoViewMode, VmoMonacoDiffViewMode, VmoMonacoPreviewSource, VmoMonacoEditorOption } from 'vmo-monaco-editor'
 import type { editor as MonacoEditor } from 'monaco-editor'
 import 'vmo-monaco-editor/dist/style.css'
 
 const diffRef = ref()
 const original = ref('Original text')
 const proposal = ref('Proposed text')
-const displayMode = ref<VmoMonacoDiffDisplayMode>('diff')
+const editMode = ref<VmoMonacoDiffEditMode>('diff')
+const viewMode = ref<VmoMonacoViewMode>('edit')
 const previewSource = ref<VmoMonacoPreviewSource>('modified')
 const diffViewMode = ref<VmoMonacoDiffViewMode>('side-by-side')
 const editorOptions = ref<VmoMonacoEditorOption>({ theme: 'vs-light', language: 'plaintext', fontSize: 14 })
@@ -62,7 +87,7 @@ const fullScreen = ref(false)
 <template>
   <VmoMonacoDiffEditor ref="diffRef"
     v-model:original-value="original" v-model:modified-value="proposal"
-    v-model:display-mode="displayMode"
+    v-model:edit-mode="editMode" v-model:view-mode="viewMode"
     v-model:preview-source="previewSource"
     v-model:diff-view-mode="diffViewMode"
     v-model:monaco-options="editorOptions"
@@ -76,7 +101,7 @@ const fullScreen = ref(false)
 </template>
 ```
 
-Preview requires a `preview` slot. Theme, font size, language, line numbers and minimap are fields of `editorOptions`. The normal editor supports `v-model:monaco-options` and `v-model:full-screen` too. Props initialize internal state; internal actions update immediately and emit `update:*`. Actual external changes override local state, while equivalent option objects preserve it. Standalone controls support `v-model:value`; font size and language also support `v-model`. Toolbar `config` controls visibility and control configuration; it is not the editor state binding interface. For notification-only usage, use `:display-mode="displayMode" @update:display-mode="handleMode($event)"`. Listen on the editor for `update:*` state events; UI does not forward individual control interaction events.
+Preview requires a `preview` slot. Theme, font size, language, line numbers and minimap are fields of `editorOptions`. The normal editor supports `v-model:monaco-options` and `v-model:full-screen` too. Props initialize internal state; internal actions update immediately and emit `update:*`. Actual external changes override local state, while equivalent option objects preserve it. Standalone controls support `v-model:value`; font size and language also support `v-model`. Toolbar `config` controls visibility and control configuration; it is not the editor state binding interface. For notification-only usage, use `:edit-mode="editMode" @update:edit-mode="handleMode($event)"`. Listen on the editor for `update:*` state events; UI does not forward individual control interaction events.
 
 ### UI Config
 

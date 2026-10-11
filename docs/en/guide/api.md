@@ -1,12 +1,36 @@
 # Complete component API reference
 
+## Independent view and content state
+
+Both editors expose `viewMode: 'edit' | 'preview'` through `v-model:view-mode`, `update:viewMode` and `view-mode-change`. The diff editor additionally exposes `editMode: 'original' | 'modified' | 'diff'` through `v-model:edit-mode`, `update:editMode` and `edit-mode-change`. Changing one never changes the other. `diffViewMode` only selects the comparison layout; `previewSource` only selects the preview draft. Props initialize state and real parent changes synchronize it; without writeback local changes persist.
+
+Both editors provide the same `default`, `prefix`, `preview`, and `suffix` slots. The preview payload is `{ content, language, source, theme }`; the ordinary editor's source is always `original`. Preview requires a preview slot. Removing it returns to `edit` while retaining the diff editor's `editMode`. The ordinary editor preserves its Monaco instance and draft across view changes.
+
+`displayMode`, `currentDisplayMode`, and `changeDisplayMode` are deprecated compatibility interfaces on the diff editor. The current value is a derived projection: preview when viewMode is preview, otherwise editMode. Explicit new props take priority for their own dimension. New integrations should bind the separate states.
+
+```vue
+<VmoMonacoEditor v-model="body" v-model:view-mode="viewMode">
+  <template #preview="{ content, language, source, theme }">
+    <VmoPlainTextPreview :content="content" :theme="theme" />
+  </template>
+</VmoMonacoEditor>
+<VmoMonacoDiffEditor
+  v-model:original-value="body" v-model:modified-value="proposal"
+  v-model:view-mode="viewMode" v-model:edit-mode="editMode">
+  <template #preview="{ content, language, source, theme }">
+    <VmoPlainTextPreview :content="content" :theme="theme" />
+  </template>
+</VmoMonacoDiffEditor>
+```
+
+
 [简体中文](../../guide/api)
 
 This reference covers all 15 components exported by the current source. All props are optional and can use kebab-case in templates. Component refs are `null` before mounting. Reactive state is automatically unwrapped on component instances. Methods return `void` unless stated otherwise.
 
 These components do not restrict instance access with `expose()`: props and members returned by `setup()` are accessible through refs. All returned members are listed below. Internal helpers are documented for clarity; use public methods to change state. Vue built-ins such as `$el` and `$props` are not library-specific APIs.
 
-Type aliases: `Option` = `VmoMonacoEditorOption`, `Target` = `VmoMonacoControlTarget`, `Pair` = `{ originalValue: string; modifiedValue: string }`, `Mode` = `original | modified | diff | preview`, `ViewMode` = `side-by-side | inline`, `Source` = `original | modified`, `Theme` = `vs-dark | vs-light`. All enum values are strings.
+Type aliases: `Option` = `VmoMonacoEditorOption`, `Target` = `VmoMonacoControlTarget`, `Pair` = `{ originalValue: string; modifiedValue: string }`, `Mode` = `original | modified | diff | preview`, `LayoutMode` = `side-by-side | inline`, `ViewMode` = `edit | preview`, `EditMode` = `original | modified | diff`, `Source` = `original | modified`, `Theme` = `vs-dark | vs-light`. All enum values are strings.
 
 ## VmoMonacoEditor
 
@@ -14,6 +38,7 @@ Type aliases: `Option` = `VmoMonacoEditorOption`, `Target` = `VmoMonacoControlTa
 
 | `Property` | Type | Default | Description |
 | --- | --- | --- | --- |
+| `viewMode` | `'edit' \| 'preview'` | `'edit'` | Independent editor/preview state; supports `v-model:view-mode` |
 | `modelValue` | `string` | `'//code content gose here...'` | Editable content supporting `v-model` |
 | `prefix` | `string` | `'(()=>{})'` | Content above the editor, outside the model |
 | `suffix` | `string` | `'};'` | Content below the editor, outside the model |
@@ -33,6 +58,7 @@ Monaco defaults are `automaticLayout: true`, `theme: 'vs-dark'`, `language: 'typ
 
 | `Event` | Payload | When emitted |
 | --- | --- | --- |
+| `update:viewMode` / `view-mode-change` | ViewMode | View state actually changes |
 | `update:modelValue` | `string` | Immediate edits when needConfirm=false, or `commit()` |
 | `update:monacoOptions` / `options-change` | `VmoMonacoEditorOption` | Controls or API change internal options; returns an independent snapshot |
 | `update:fullScreen` / `fullscreen-change` | `boolean` | Fullscreen state actually changes |
@@ -44,6 +70,7 @@ Monaco defaults are `automaticLayout: true`, `theme: 'vs-dark'`, `language: 'typ
 
 | `Property` | Type | Description |
 | --- | --- | --- |
+| `currentViewMode` | ViewMode | Current independent view state |
 | `computedMonacoEditorOption` | Option | Current options after merging defaults and internal options |
 | `currentReadOnly` | boolean | Current readonly state from disabled and monacoOptions.readOnly |
 | `isFullScreen` | boolean | Current fullscreen state, initialized from fullScreen |
@@ -54,6 +81,8 @@ Monaco defaults are `automaticLayout: true`, `theme: 'vs-dark'`, `language: 'typ
 
 | `Signature` | Description |
 | --- | --- |
+| `changeViewMode(mode: ViewMode)` | Changes view only; preview requires its slot |
+| `togglePreview()` | Toggles edit/preview, preserving the Monaco instance and draft |
 | `insertCodeString(codeString: string)` | Insert at the cursor without replacing the selection; no action without a cursor |
 | `resetMonacoEditorOptions(options: Option)` | Deeply merge options; watchers apply them to Monaco |
 | `changeFullScreen(value: boolean)` | Set fullscreen state and emit an update when it changes |
@@ -83,6 +112,7 @@ See [Normal editor](./editor).
 | `default` | None | Above the editor, typically a toolbar; no content when omitted |
 | `prefix` | `{ option: VmoMonacoEditorOption }` | Replaces extra content above the editor; otherwise renders the prefix prop through v-html. Present when the slot exists or prefix is nonempty |
 | `suffix` | `{ option: VmoMonacoEditorOption }` | Replaces extra content below the editor; otherwise renders the suffix prop through v-html. Present when the slot exists or suffix is nonempty |
+| `preview` | `{ content: string; language: string; source: 'original'; theme: Theme }` | Current draft; only renders in preview mode; no built-in renderer. |
 
 `option` contains current options merged with defaults and follows state changes. Prefix/suffix content is outside the Monaco model. These slots do not receive a draft or submission methods. Use Vue interpolation for plain text and trusted content for HTML props.
 
@@ -100,14 +130,17 @@ In immediate mode, each side emits update:originalValue or update:modifiedValue 
 
 `needConfirm` delays only update:originalValue/update:modifiedValue content submission. Mode, preview source, layout, options and fullscreen update:* events remain immediate. `bidibind` affects external text synchronization only. External option props synchronize without emitting option writeback events; internal controls/API changes emit option snapshots.
 
+ | `currentEditMode` | EditMode | Current content selection |
 ### Props
 
 | `Property` | Type | Default | Description |
 | --- | --- | --- | --- |
+| `viewMode` | `'edit' \| 'preview'` | `'edit'` | Independent editor/preview state; supports `v-model:view-mode` |
 | `originalValue` | `string` | `''` | `v-model:original-value` |
 | `modifiedValue` | `string` | `''` | `v-model:modified-value` |
 | `prefix` / `suffix` | `string` | `''` | Content displayed outside the models |
-| `displayMode` | `'original' \| 'modified' \| 'diff' \| 'preview'` | `'diff'` | Display mode |
+| `editMode` | `'original' \| 'modified' \| 'diff'` | `'diff'` | Independent content selection; supports `v-model:edit-mode` |
+| `displayMode` | `'original' \| 'modified' \| 'diff' \| 'preview'` | `'diff'` | Deprecated compatibility mode; explicit new props take priority |
 | `previewSource` | `'original' \| 'modified'` | Unset | Override the preview source |
 | `diffViewMode` | `'side-by-side' \| 'inline'` | `'side-by-side'` | Diff layout |
 | `editableOriginal` | `boolean` | `false` | Allow original edits |
@@ -129,6 +162,8 @@ Here, `pair` means `{ originalValue: string; modifiedValue: string }`.
 
 | `Event` | Payload | Description |
 | --- | --- | --- |
+| `update:viewMode` / `view-mode-change` | ViewMode | View state actually changes |
+| `update:editMode` / `edit-mode-change` | EditMode | Content selection actually changes, including during preview |
 | `update:displayMode` / `mode-change` | Display mode string | Display mode actually changes |
 | `update:previewSource` / `preview-source-change` | `'original' \| 'modified'` | Preview source actually changes |
 | `update:diffViewMode` / `diff-view-mode-change` | `'side-by-side' \| 'inline'` | Diff layout actually changes |
@@ -147,11 +182,12 @@ Here, `pair` means `{ originalValue: string; modifiedValue: string }`.
 
 | `Property` | Type | Description |
 | --- | --- | --- |
+| `currentViewMode` | ViewMode | Current independent view state |
 | `computedMonacoEditorOption` | Option | Current options after merging defaults and internal options |
 | `isFullScreen` | boolean | Current fullscreen state, initialized from fullScreen |
 | `currentReadOnly` | boolean | Whether the current view is readonly |
 | `currentDisplayMode` | Mode | Actual mode, which may fall back when no preview slot exists |
-| `currentDiffViewMode` | ViewMode | Current side-by-side/inline layout |
+| `currentDiffViewMode` | LayoutMode | Current side-by-side/inline layout |
 | `hasPreview` | boolean | Whether a preview slot exists |
 | `currentPreviewSource` | Source | Current preview source |
 | `modifiedInnerValue` | string | Internal proposal draft; originalInnerValue is not returned and cannot be accessed directly |
@@ -174,10 +210,12 @@ Here, `pair` means `{ originalValue: string; modifiedValue: string }`.
 | `refreshMonacoEditor()` | Recreate the editor; see the guide for model retention behavior |
 | `commit()` | Submit internal values; the normal editor emits update:modelValue and change; the diff editor delegates to confirm |
 | `resetMonacoDiffEditorOptions(options: Partial<Monaco.editor.IStandaloneDiffEditorConstructionOptions>)` | Deeply merge diff options; layout and edit permissions remain controlled by dedicated props/state |
-| `changeDisplayMode(mode: Mode)` | Switch views; preview requires a slot; emit update:displayMode and mode-change on an actual change |
-| `changeDiffViewMode(mode: ViewMode)` | Switch diff layout; no editor-level layout event is emitted |
-| `changePreviewSource(source: Source)` | Switch preview source; emit update:previewSource and preview-source-change on an actual change |
+| `changeViewMode(mode: ViewMode)` | Changes view only; preview requires its slot |
+| `changeEditMode(mode: EditMode)` | Changes content selection without leaving preview |
 | `togglePreview()` | Enter preview or return to the previous editing mode; no entry without a slot |
+| `changeDisplayMode(mode: Mode)` | Switch views; preview requires a slot; emit update:displayMode and mode-change on an actual change |
+| `changeDiffViewMode(mode: LayoutMode)` | Switch diff layout; no editor-level layout event is emitted |
+| `changePreviewSource(source: Source)` | Switch preview source; emit update:previewSource and preview-source-change on an actual change |
 | `acceptChange(index: number)` | Accept the current diff block by zero-based index; no action for invalid results |
 | `rejectChange(index: number)` | Reject the current diff block by zero-based index; no action for invalid results |
 | `acceptAllChanges()` | Copy the entire modified model to original without checking diffPending |
@@ -213,7 +251,7 @@ See [Diff editor and review](./diff-editor).
 
 `option` contains current options merged with defaults and follows state changes. Prefix/suffix content is outside the Monaco model. These slots do not receive a draft or submission methods. Use Vue interpolation for plain text and trusted content for HTML props.
 
-`content` is the selected source's internal draft, including uncommitted edits. `language` is the current editor language, falling back to plaintext. `source` is original/modified; `theme` is the current editor theme. This replaces the preview content area, not its outer container or source buttons (shown when the proposal is nonempty). Without this slot preview is unavailable; initial preview falls back to modified, and removing the slot exits preview.
+`content` is the selected source's internal draft, including uncommitted edits. `language` is the current editor language, falling back to plaintext. `source` is original/modified; `theme` is the current editor theme. This replaces the preview content area, not its outer container or source buttons (shown when the proposal is nonempty). Without this slot preview is unavailable; initial preview falls back to edit while preserving editMode, and removing the slot exits preview.
 
 ```vue
 <VmoMonacoDiffEditor :original-value="original" :modified-value="proposal" style="height: 500px">
@@ -264,7 +302,7 @@ The persistent status row shows content, interaction mode, current language, fon
 
 ### Emits and instance methods
 
-No custom emits. The UI does not forward child control interaction events; listen on controls in a custom default slot. Editor state updates are emitted by the editor itself. `changeContentMode(mode)` accepts original, modified or diff and applies to all diff targets: in preview, original/proposal changes the source while diff exits preview; otherwise it switches the editor view.
+No custom emits. The UI does not forward child control interaction events; listen on controls in a custom default slot. Editor state updates are emitted by the editor itself. `changeContentMode(mode)` accepts original, modified or diff and applies to all diff targets: content actions only change editMode, preserving viewMode and previewSource.
 
 ### Instance properties
 
@@ -274,7 +312,7 @@ No custom emits. The UI does not forward child control interaction events; liste
 | `editorOption` | Option | Current first-target options |
 | `diffMonacos` | VmoMonacoDiffEditorExpose[] | Diff targets supporting display mode changes |
 | `contentModes` | Mode descriptor array | Values and labels for original/proposal/diff |
-| `currentContentMode` | original / modified / diff | Current content; actual source while previewing |
+| `currentContentMode` | original / modified / diff | Current editMode, independent of previewSource |
 | `isPreview` | boolean | Whether currently previewing |
 | `diffViewLabel` | string | Side-by-side/inline label |
 | `interactionLabel` | string | Edit/readonly/preview label |
@@ -309,7 +347,7 @@ With a custom default slot the built-in review control is not created, so review
 | `acceptAllChanges` | `() => void` | Accept all changes |
 | `rejectAllChanges` | `() => void` | Reject all changes |
 | `changeDisplayMode` | `(mode: Mode) => void` | Switch display mode; preview applies only to preview-capable targets |
-| `changeDiffViewMode` | `(mode: ViewMode) => void` | Switch side-by-side/inline layout |
+| `changeDiffViewMode` | `(mode: LayoutMode) => void` | Switch side-by-side/inline layout |
 | `confirm` | `() => void` | Confirm the current content |
 
 Destructure camelCase names even though template bindings use kebab-case. The slot does not supply `canReview`, `currentDiffViewMode` or `closePanel`. Disable bulk buttons using `diffPending || !lineChanges.length`; the methods themselves do not enforce this condition.
@@ -622,7 +660,7 @@ No slots. Supplied default or named slot content is not rendered; customize thro
 
 | `Property` | Type | Description |
 | --- | --- | --- |
-| `previewMonacos` | VmoMonacoDiffEditorExpose[] | Targets with a preview slot and preview methods |
+| `previewMonacos` | VmoMonacoEditorExpose[] | Targets with a preview slot and preview methods |
 | `currentValue` | boolean | Local preview state initialized from value, synchronized with actual external changes and target state |
 
 
@@ -701,7 +739,7 @@ type ReviewControlPayload = {
 | `canReview` | boolean | Not pending and has differences; used by default bulk buttons |
 | `currentDisplayMode` | Mode | First target’s mode, falling back to diff |
 | `hasPreview` | boolean | First target’s preview availability, falling back to false |
-| `currentDiffViewMode` | ViewMode | First target’s layout, falling back to side-by-side |
+| `currentDiffViewMode` | LayoutMode | First target’s layout, falling back to side-by-side |
 
 
 ### Instance methods
@@ -715,7 +753,7 @@ type ReviewControlPayload = {
 | `rejectAllChanges()` | Call reject all on every valid target |
 | `confirm()` | Confirm every valid target |
 | `changeDisplayMode(mode: Mode)` | Synchronize display mode |
-| `changeDiffViewMode(mode: ViewMode)` | Synchronize diff layout |
+| `changeDiffViewMode(mode: LayoutMode)` | Synchronize diff layout |
 
 These methods do not check `canReview`; custom menus should disable unavailable actions. `closePanel` and target lists are not returned on the instance. The default slot supplies `lineChanges`, `diffPending`, `currentDisplayMode`, `hasPreview`, and the review/mode methods above (excluding `togglePanel`). The UI’s `review-actions` slot forwards the same parameters.
 
@@ -737,7 +775,7 @@ These methods do not check `canReview`; custom menus should disable unavailable 
 | `acceptAllChanges` | `() => void` | Accept all changes |
 | `rejectAllChanges` | `() => void` | Reject all changes |
 | `changeDisplayMode` | `(mode: Mode) => void` | Switch display mode; preview applies only to preview-capable targets |
-| `changeDiffViewMode` | `(mode: ViewMode) => void` | Switch side-by-side/inline layout |
+| `changeDiffViewMode` | `(mode: LayoutMode) => void` | Switch side-by-side/inline layout |
 | `confirm` | `() => void` | Confirm the current content |
 
 Destructure camelCase names even though template bindings use kebab-case. The slot does not supply `canReview`, `currentDiffViewMode` or `closePanel`. Disable bulk buttons using `diffPending || !lineChanges.length`; the methods themselves do not enforce this condition.

@@ -20,7 +20,12 @@
           <span v-html="prefix" class="extra-code"></span>
         </div>
       </slot>
-      <div ref="MonacoEditorRef" class="ide-container"></div>
+      <div v-show="currentViewMode === 'edit'" ref="MonacoEditorRef" class="ide-container"></div>
+      <div v-if="currentViewMode === 'preview'" class="vmo-preview-container">
+        <div class="vmo-preview-content">
+          <slot name="preview" :content="previewContent" :language="previewLanguage" :source="currentPreviewSource" :theme="computedMonacoEditorOption.theme"></slot>
+        </div>
+      </div>
       <slot v-if="!!suffix || context.slots.suffix" name="suffix" :option="computedMonacoEditorOption">
         <div :class="['suffix']">
           <span v-html="suffix" class="extra-code"></span>
@@ -55,16 +60,23 @@
 .vmo-monaco-editor-container .ide-container {
   @apply flex flex-col h-0 flex-grow;
 }
+.vmo-monaco-editor-container .vmo-preview-container {
+  @apply flex flex-col flex-grow h-0 min-h-0;
+}
+.vmo-monaco-editor-container .vmo-preview-content {
+  @apply flex-grow min-h-0 overflow-auto;
+}
 </style>
 
 <script lang="ts">
-import { defineComponent, ref, shallowRef, onMounted, onBeforeUnmount, watch, computed, readonly, nextTick } from 'vue'
+import { defineComponent, ref, shallowRef, onMounted, onBeforeUnmount, onBeforeUpdate, watch, computed, readonly, nextTick } from 'vue'
 import { mergeDeepRight, clone, equals, isNil } from 'ramda'
 import 'monaco-editor/esm/vs/basic-languages/css/css.contribution'
 import 'monaco-editor/esm/vs/basic-languages/xml/xml.contribution'
 import 'monaco-editor/esm/vs/basic-languages/javascript/javascript.contribution'
 import type { PropType, StyleValue } from 'vue'
 import { useReminderPlugin } from '../../index'
+import type { VmoMonacoViewMode } from '../vmo-monaco-diff-editor/types'
 import type { VmoMonacoContext } from '@type'
 import * as Monaco from 'monaco-editor'
 import { syncMonacoOptions } from '../../use.lib/sync-monaco-options'
@@ -99,6 +111,10 @@ export default defineComponent({
       type: Boolean as PropType<boolean>,
       default: true
     },
+    viewMode: {
+      type: String as PropType<VmoMonacoViewMode>,
+      default: 'edit'
+    },
     fullScreen: {
       type: Boolean,
       default: false
@@ -124,12 +140,32 @@ export default defineComponent({
       default: () => ({})
     }
   },
-  emits: ['change', 'update:modelValue', 'update:monacoOptions', 'options-change', 'update:fullScreen', 'fullscreen-change', 'focuse', 'blur'],
+  emits: ['update:viewMode', 'view-mode-change', 'change', 'update:modelValue', 'update:monacoOptions', 'options-change', 'update:fullScreen', 'fullscreen-change', 'focuse', 'blur'],
   setup(props, context) {
     // 全屏只影响组件容器位置，不直接改变 Monaco 实例本身。
     const isFullScreen = ref(props.fullScreen)
     // innerValue 是 Monaco 内部真实内容缓存，用于 needConfirm 场景下延迟提交。
     const innerValue = ref('')
+    const hasPreview = ref(!!context.slots?.preview)
+    const currentViewMode = ref<VmoMonacoViewMode>(props.viewMode === 'preview' && hasPreview.value ? 'preview' : 'edit')
+    const currentPreviewSource = 'original' as const
+    const previewContent = computed(() => innerValue.value)
+    const previewLanguage = computed(() => computedMonacoEditorOption.value.language || 'plaintext')
+    watch(() => props.viewMode, changeViewMode)
+    onBeforeUpdate(() => {
+      hasPreview.value = !!context.slots?.preview
+      if (!hasPreview.value && currentViewMode.value === 'preview') changeViewMode('edit')
+    })
+    function changeViewMode(mode: VmoMonacoViewMode) {
+      if (mode === 'preview' && !hasPreview.value) return
+      if (mode === currentViewMode.value) return
+      currentViewMode.value = mode
+      context.emit('update:viewMode', mode)
+      context.emit('view-mode-change', mode)
+    }
+    function togglePreview() {
+      changeViewMode(currentViewMode.value === 'preview' ? 'edit' : 'preview')
+    }
     // Monaco 的 DOM 容器和 editor 实例都不需要深层响应式，shallowRef 可以避免 Vue 递归代理第三方对象。
     const MonacoEditorRef = shallowRef(null as any)
     const monacoEditorInstance = shallowRef(null as null | Monaco.editor.IStandaloneCodeEditor)
@@ -362,6 +398,13 @@ export default defineComponent({
       MonacoEditorRef,
       isFullScreen,
       currentReadOnly,
+      currentViewMode,
+      hasPreview,
+      currentPreviewSource,
+      previewContent,
+      previewLanguage,
+      changeViewMode,
+      togglePreview,
       // theme: computedMonacoEditorOption.value.theme,
       computedMonacoEditorOption,
       innerValue,

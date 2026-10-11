@@ -31,7 +31,7 @@
         <div v-if="diffMonacos.length" class="content-modes" role="group" aria-label="内容视图">
           <button v-for="mode in contentModes" :key="mode.value" type="button"
             :aria-pressed="currentContentMode === mode.value"
-            :title="isPreview && mode.value === 'diff' ? '退出预览并查看比对' : mode.label"
+            :title="mode.label"
             @click="changeContentMode(mode.value)">{{ mode.label }}</button>
         </div>
         <span v-else>正文</span>
@@ -42,6 +42,7 @@
         <span class="state-value">{{ interactionLabel }}</span>
         <preview-toggle v-if="config.preview !== false" />
       </div>
+      <span v-if="isPreview && diffMonacos.length" class="state-detail">预览来源：{{ diffMonacos[0].currentPreviewSource === 'original' ? '正文' : '提案' }}</span>
       <div class="state-group state-settings" role="status" aria-label="当前编辑器设置">
         <span>语言 <strong>{{ editorOption.language || 'plaintext' }}</strong></span>
         <span>字号 <strong>{{ editorOption.fontSize || 12 }} px</strong></span>
@@ -202,9 +203,9 @@ export default defineComponent({
     const diffMonacos = computed(() => monacos.value.filter((target): target is VmoMonacoDiffEditorExpose =>
       typeof (target as Partial<VmoMonacoDiffEditorExpose>)?.changeDisplayMode === 'function'))
     const primaryDiff = computed(() => diffMonacos.value[0])
-    const isPreview = computed(() => primaryDiff.value?.currentDisplayMode === 'preview')
-    const currentContentMode = computed(() => isPreview.value
-      ? primaryDiff.value?.currentPreviewSource : primaryDiff.value?.currentDisplayMode || 'original')
+    const isPreview = computed(() => monacos.value[0]?.currentViewMode === 'preview' || primaryDiff.value?.currentDisplayMode === 'preview')
+    const currentContentMode = computed(() => primaryDiff.value?.currentEditMode ?? (isPreview.value
+      ? primaryDiff.value?.currentPreviewSource : primaryDiff.value?.currentDisplayMode || 'original'))
     const diffViewLabel = computed(() => primaryDiff.value?.currentDiffViewMode === 'inline' ? '行内' : '并排')
     const interactionLabel = computed(() => isPreview.value ? '预览'
       : (monacos.value[0]?.currentReadOnly ?? editorOption.value.readOnly) ? '只读' : '编辑')
@@ -215,7 +216,8 @@ export default defineComponent({
     ] as const
     function changeContentMode(mode: 'original' | 'modified' | 'diff') {
       diffMonacos.value.forEach(editor => {
-        if (editor.currentDisplayMode === 'preview' && mode !== 'diff') editor.changePreviewSource(mode)
+        if (typeof editor.changeEditMode === 'function') editor.changeEditMode(mode)
+        else if (editor.currentDisplayMode === 'preview' && mode !== 'diff') editor.changePreviewSource(mode)
         else editor.changeDisplayMode(mode)
       })
     }

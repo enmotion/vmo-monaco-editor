@@ -1,5 +1,29 @@
 # vmo-monaco-editor
 
+## 独立的视图状态与内容状态
+
+两个编辑器都提供 `viewMode: 'edit' | 'preview'`，支持 `v-model:view-mode`、`update:viewMode` 与 `view-mode-change`。差异编辑器另提供 `editMode: 'original' | 'modified' | 'diff'`，支持 `v-model:edit-mode`、`update:editMode` 与 `edit-mode-change`。改变任一状态不会改变另一状态。`diffViewMode` 仅表示比对布局，`previewSource` 仅表示预览草稿来源。props 初始化内部状态，外部实际改变时同步；外部不回写则保留内部操作结果。
+
+两个编辑器的插槽一致：`default`、`prefix`、`preview`、`suffix`。preview 参数为 `{ content, language, source, theme }`，普通编辑器的 source 固定为 original。没有 preview 插槽时无法进入预览；移除插槽会返回 edit，保留差异编辑器的 editMode。普通编辑器切换时保留 Monaco 实例和草稿。
+
+差异编辑器的 `displayMode`、`currentDisplayMode`、`changeDisplayMode` 是已弃用的兼容接口；currentDisplayMode 是派生值：viewMode 为 preview 时返回 preview，否则返回 editMode。显式的新 props 对各自维度优先。新接入请分别绑定两个状态。
+
+```vue
+<VmoMonacoEditor v-model="body" v-model:view-mode="viewMode">
+  <template #preview="{ content, language, source, theme }">
+    <VmoPlainTextPreview :content="content" :theme="theme" />
+  </template>
+</VmoMonacoEditor>
+<VmoMonacoDiffEditor
+  v-model:original-value="body" v-model:modified-value="proposal"
+  v-model:view-mode="viewMode" v-model:edit-mode="editMode">
+  <template #preview="{ content, language, source, theme }">
+    <VmoPlainTextPreview :content="content" :theme="theme" />
+  </template>
+</VmoMonacoDiffEditor>
+```
+
+
 [中文文档](https://enmotion.github.io/vmo-monaco-editor/) · [完整组件 API](https://enmotion.github.io/vmo-monaco-editor/guide/api) · [English documentation](https://enmotion.github.io/vmo-monaco-editor/en/) · [Complete API reference](https://enmotion.github.io/vmo-monaco-editor/en/guide/api)
 
 Vue 3 wrapper for `monaco-editor`, with a normal editor, a diff/review editor, and a reusable toolbar layer.
@@ -196,7 +220,7 @@ const diffRef = ref()
     v-model:original-value="original"
     v-model:modified-value="modified"
     :need-confirm="true"
-    display-mode="diff"
+    edit-mode="diff"
     diff-view-mode="inline"
     :editable-original="true"
     :editable-modified="true"
@@ -230,11 +254,12 @@ Review events such as `accept-all` and `reject-change` still emit so the host ap
 
 ## Display state and two-way bindings
 
-The UI separates content (original, proposal, diff) from interaction mode (edit, readonly, preview). For compatibility the API retains four `displayMode` values; `previewSource` selects the previewed content. `disabled`, `editableOriginal` and `editableModified` determine editing permissions; `currentReadOnly` exposes the current view's editing restriction.
+The UI separates content (original, proposal, diff) from interaction mode (edit, readonly, preview). The API uses independent viewMode and editMode; four `displayMode` values remain only for compatibility; `previewSource` selects the previewed content. `disabled`, `editableOriginal` and `editableModified` determine editing permissions; `currentReadOnly` exposes the current view's editing restriction.
 
 | State | Prop / v-model | Update event |
 | --- | --- | --- |
-| Original / proposal / diff / preview | `displayMode` / `v-model:display-mode` | `update:displayMode` |
+| Edit / preview | `viewMode` / `v-model:view-mode` | `update:viewMode` |
+| Original / proposal / diff | `editMode` / `v-model:edit-mode` | `update:editMode` |
 | Preview original / proposal | `previewSource` / `v-model:preview-source` | `update:previewSource` |
 | Side-by-side / inline | `diffViewMode` / `v-model:diff-view-mode` | `update:diffViewMode` |
 | Theme / font size / language / line numbers / minimap | `monacoOptions` / `v-model:monaco-options` | `update:monacoOptions` |
@@ -245,7 +270,7 @@ Props initialize local state. Internal actions update it before emitting events.
 
 ```vue
 <VmoMonacoDiffEditor
-  v-model:display-mode="displayMode"
+  v-model:edit-mode="editMode" v-model:view-mode="viewMode"
   v-model:preview-source="previewSource"
   v-model:diff-view-mode="diffViewMode"
   v-model:monaco-options="editorOptions"
@@ -257,7 +282,7 @@ Props initialize local state. Internal actions update it before emitting events.
 
 Define the binding variables in the parent: for example `'diff'`, `'modified'`, `'side-by-side'`, `{}`, `{}` and `false`, respectively. See the [complete toolbar binding example](docs/en/guide/toolbar.md#state-bindings). `needConfirm` delays original/proposal content submission only; all state updates remain immediate. Preview requires a `preview` slot.
 
-To receive notifications without writing back, use `:display-mode="displayMode" @update:display-mode="handleMode($event)"`. Existing `mode-change` and `preview-source-change` events remain available, alongside `diff-view-mode-change`, `options-change`, `diff-options-change` and `fullscreen-change`. Listen on the editor itself for changes initiated by the default toolbar; UI forwarding is unnecessary.
+To receive notifications without writing back, use `:edit-mode="editMode" @update:edit-mode="handleMode($event)"`. Existing `mode-change` and `preview-source-change` events remain available, alongside `diff-view-mode-change`, `options-change`, `diff-options-change` and `fullscreen-change`. Listen on the editor itself for changes initiated by the default toolbar; UI forwarding is unnecessary.
 
 ### `VmoMonacoDiffEditor` Props
 
@@ -463,7 +488,8 @@ import type {
   VmoMonacoDiffChangePayload,
   VmoMonacoDiffConfirmPayload,
   VmoMonacoDiffReviewActionPayload,
-  VmoMonacoDiffDisplayMode,
+  VmoMonacoDiffEditMode,
+  VmoMonacoViewMode,
   VmoMonacoDiffViewMode,
   VmoMonacoControlTarget
 } from 'vmo-monaco-editor'
@@ -586,14 +612,14 @@ The slot receives `content` (the internal current draft, including uncommitted
 edits), `language`, `source` (`original` or `modified`), and `theme`. Use any of the
 three preview components or your own renderer inside it.
 
-Without an explicit `previewSource`, entering preview from Original selects the original draft; entering from Proposal or Diff selects the proposal. An explicit source prop initializes the source and synchronizes on actual external changes. Local source changes remain effective while that prop is unchanged, including on re-entry into preview. The status row and the preview source buttons switch original/proposal without leaving preview; selecting Diff in the status row exits preview. Preview does not commit text or replace the two models. Removing the slot exits preview to Proposal.
+Without an explicit `previewSource`, entering preview from Original selects the original draft; entering from Proposal or Diff selects the proposal. An explicit source prop initializes the source and synchronizes on actual external changes. Local source changes remain effective while that prop is unchanged, including on re-entry into preview. The status row changes editMode independently; the preview source buttons change previewSource without leaving preview. Preview does not commit text or replace the two models. Removing the slot returns to edit and preserves editMode.
 
-Use `v-model:display-mode` and `v-model:preview-source` to track view and source, or listen to `@update:display-mode="handleMode($event)"` and `@update:preview-source="handleSource($event)"` without writing back. The editor retains `mode-change` and `preview-source-change` notifications. Neither `needConfirm` nor `bidibind` delays these state updates. Preview itself has no editable input; `currentReadOnly` describes the editor view's editing permission.
+Use `v-model:view-mode` and `v-model:preview-source` to track view and source, or listen to `@update:view-mode="handleMode($event)"` and `@update:preview-source="handleSource($event)"` without writing back. The editor retains `mode-change` and `preview-source-change` notifications. Neither `needConfirm` nor `bidibind` delays these state updates. Preview itself has no editable input; `currentReadOnly` describes the editor view's editing permission.
 
-The public API includes `togglePreview()`, `changeDisplayMode('preview')`,
+The public API includes `togglePreview()`, `changeViewMode('preview')`,
 `changePreviewSource('original' | 'modified')`, `hasPreview`, and
-`currentPreviewSource`. Initial `displayMode="preview"` is also supported when the
-slot is present. An initial preview mode without a slot falls back to Proposal.
+`currentPreviewSource`. Initial `viewMode="preview"` is also supported when the
+slot is present. An initial preview mode without a slot falls back to edit, preserving editMode.
 
 
 ### Language Selection
@@ -629,7 +655,7 @@ Bilingual VitePress sources live in `docs/`. GitHub Pages deploys through `.gith
 
 | Component | Slots | Props and fallback |
 | --- | --- | --- |
-| VmoMonacoEditor | default; prefix; suffix | default: no props, toolbar above editor. prefix/suffix: `{ option }`, current merged options; fallback renders the corresponding HTML prop outside the model |
+| VmoMonacoEditor | default; prefix; suffix; preview | default: no props, toolbar above editor. prefix/suffix: `{ option }`, current merged options; fallback renders the corresponding HTML prop outside the model. preview: `{ content, language, source, theme }`; source is original |
 | VmoMonacoDiffEditor | default; prefix; suffix; preview | Same editor slots; preview: `{ content, language, source, theme }`, internal draft including uncommitted edits; no built-in content renderer, only renders in preview mode |
 | VmoMonacoUi | default; review-actions | default: no props, replaces upper controls but preserves status row/injection. review-actions: review props below, replaces built-in popover content when config.reviewActions is enabled and the menu is open |
 | VmoMonacoDiffReview | default | Review props below; replaces an open popover's content while retaining trigger, container and outside-click closing |
