@@ -3,9 +3,9 @@
 </template>
 
 <script lang="ts">
-import { computed, defineComponent } from 'vue'
+import { defineComponent } from 'vue'
 import type { PropType } from 'vue'
-import { createVmoMonacoControlProps, useVmoMonacoControl } from './use-monaco-control'
+import { createVmoMonacoControlProps, useVmoMonacoControl, useVmoMonacoControlValue } from './use-monaco-control'
 
 export type VmoMonacoLineNumbersControlValue = 'on' | 'off'
 export type VmoMonacoLineNumbersControlConfig = VmoMonacoLineNumbersControlValue
@@ -22,12 +22,15 @@ export default defineComponent({
   emits: ['update:value', 'toggle', 'commit'],
   setup(props, context) {
     const { monacos, editorOption, eachMonaco } = useVmoMonacoControl(props)
-    const currentValue = computed(() => {
-      return props.value || props.config || editorOption.value.lineNumbers || 'on'
-    })
+    const currentValue = useVmoMonacoControlValue(
+      () => props.value ?? props.config,
+      () => editorOption.value.lineNumbers || 'on',
+      value => eachMonaco(monaco => monaco.resetMonacoEditorOptions({ lineNumbers: value }))
+    )
 
     function toggleLineNumbers() {
       const lineNumbers: VmoMonacoLineNumbersControlValue = currentValue.value == 'on' ? 'off' : 'on'
+      currentValue.value = lineNumbers
       eachMonaco(monaco => {
         monaco.resetMonacoEditorOptions({
           lineNumbers
@@ -44,6 +47,7 @@ export default defineComponent({
     }
 
     return {
+      currentValue,
       toggleLineNumbers
     }
   }

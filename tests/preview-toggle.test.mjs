@@ -1,4 +1,6 @@
 import { test } from 'node:test'
+import { createLibraryLoader } from './helpers/load-library.mjs'
+const controlValueHelper = createLibraryLoader()('components/vmo-monaco-ui/controls/use-monaco-control.ts').useVmoMonacoControlValue
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import { transpileModule, runInNewContext } from './helpers/source-runtime.mjs'
@@ -11,7 +13,7 @@ function load(targets) {
   const source = fs.readFileSync(new URL('../components/vmo-monaco-ui/controls/preview-toggle.vue', import.meta.url), 'utf8')
   const context = { exports: {}, require(name) {
     if (name === 'vue') return Vue
-    if (name === './use-monaco-control') return { createVmoMonacoControlProps: () => ({}), useVmoMonacoControl: () => ({ monacos: Vue.ref(targets) }) }
+    if (name === './use-monaco-control') return { useVmoMonacoControlValue: controlValueHelper, createVmoMonacoControlProps: () => ({}), useVmoMonacoControl: () => ({ monacos: Vue.ref(targets) }) }
     throw new Error(name)
   } }
   runInNewContext(transpileModule(source.match(/<script lang="ts">([\s\S]*?)<\/script>/)[1], { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText, context)
@@ -67,4 +69,25 @@ test('preview toggle honors controlled state and tolerates an empty editor selec
   control.togglePreview()
   assert.equal(events.find(([name]) => name === 'toggle')[1], false)
   assert.equal(load([]).setup({}, { emit() {} }).currentValue.value, false)
+})
+
+test('preview props synchronize targets while unchanged props preserve internal toggles', () => {
+  const target = editor('original'), scope = Vue.effectScope(), props = Vue.reactive({ value: true }), events = []
+  const control = scope.run(() => load([target]).setup(props, { emit: (...e) => events.push(e) }))
+  assert.equal(target.currentDisplayMode, 'preview')
+  control.togglePreview()
+  assert.equal(target.currentDisplayMode, 'original')
+  assert.equal(control.currentValue.value, false)
+  assert.equal(props.value, true)
+  control.togglePreview()
+  props.value = false
+  assert.equal(target.currentDisplayMode, 'original')
+  assert.equal(control.currentValue.value, false)
+  props.value = true
+  assert.equal(target.currentDisplayMode, 'preview')
+  assert.equal(control.currentValue.value, true)
+  props.value = undefined
+  target.togglePreview()
+  assert.equal(control.currentValue.value, false)
+  scope.stop()
 })

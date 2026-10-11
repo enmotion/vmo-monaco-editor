@@ -33,3 +33,40 @@ test('toolbar provides its target reactively and normalizes flags, enums and per
   props.config = { language: false, languages: ['sql', 'python'] }
   assert.equal(ui.languageVisible.value, false)
 })
+
+test('toolbar separates preview source from editor view and reflects current settings', () => {
+  const component = createLibraryLoader({ vue: { ...Vue, provide() {} } })('components/vmo-monaco-ui/vmo-monaco-ui.vue').default
+  const calls = []
+  const editor = Vue.reactive({
+    computedMonacoEditorOption: { language: 'markdown', fontSize: 16, theme: 'vs-dark' },
+    currentDisplayMode: 'original', currentPreviewSource: 'original', currentReadOnly: true,
+    currentDiffViewMode: 'side-by-side',
+    changeDisplayMode(mode) { calls.push(['view', mode]); this.currentDisplayMode = mode },
+    changePreviewSource(source) { calls.push(['source', source]); this.currentPreviewSource = source }
+  })
+  const props = Vue.reactive({ monaco: editor, config: {} })
+  const ui = component.setup(props, {})
+  assert.equal(ui.currentContentMode.value, 'original')
+  assert.equal(ui.interactionLabel.value, '只读')
+  editor.currentDisplayMode = 'preview'
+  ui.changeContentMode('modified')
+  assert.deepEqual(calls.pop(), ['source', 'modified'])
+  assert.equal(ui.currentContentMode.value, 'modified')
+  assert.equal(ui.interactionLabel.value, '预览')
+  assert.equal(editor.currentDisplayMode, 'preview')
+  ui.changeContentMode('diff')
+  assert.deepEqual(calls.pop(), ['view', 'diff'])
+  assert.equal(ui.currentContentMode.value, 'diff')
+  assert.equal(ui.diffViewLabel.value, '并排')
+  editor.currentDiffViewMode = 'inline'
+  editor.currentReadOnly = false
+  assert.equal(ui.diffViewLabel.value, '行内')
+  assert.equal(ui.interactionLabel.value, '编辑')
+  editor.computedMonacoEditorOption.fontSize = 20
+  assert.equal(ui.editorOption.value.fontSize, 20)
+  props.monaco = { computedMonacoEditorOption: { readOnly: true, language: 'sql' } }
+  assert.equal(ui.diffMonacos.value.length, 0)
+  assert.equal(ui.currentContentMode.value, 'original')
+  assert.equal(ui.interactionLabel.value, '只读')
+  assert.equal(ui.editorOption.value.language, 'sql')
+})

@@ -5,8 +5,8 @@
 </template>
 
 <script lang="ts">
-import { computed, defineComponent } from 'vue'
-import { createVmoMonacoControlProps, useVmoMonacoControl } from './use-monaco-control'
+import { defineComponent } from 'vue'
+import { createVmoMonacoControlProps, useVmoMonacoControl, useVmoMonacoControlValue } from './use-monaco-control'
 
 export type VmoMonacoFullScreenControlValue = boolean
 export type VmoMonacoFullScreenControlConfig = boolean
@@ -23,19 +23,22 @@ export default defineComponent({
   emits: ['update:value', 'toggle', 'commit'],
   setup(props, context) {
     const { monacos } = useVmoMonacoControl(props)
-    const currentValue = computed(() => {
-      return typeof props.value == 'boolean'
-        ? props.value
-        : typeof props.config == 'boolean'
-          ? props.config
-          : props.isFullScreen || !!monacos.value[0]?.isFullScreen
-    })
+    function applyFullScreen(value: boolean) {
+      const monaco = monacos.value[0]
+      if (monaco && !!monaco.isFullScreen !== value) monaco.fullscreenSwitch()
+    }
+    const currentValue = useVmoMonacoControlValue(
+      () => props.value ?? props.config ?? props.isFullScreen,
+      () => !!monacos.value[0]?.isFullScreen,
+      applyFullScreen
+    )
 
     function toggleFullScreen() {
       const monaco = monacos.value[0]
       if (!monaco) return
       const nextValue = !currentValue.value
-      monaco.fullscreenSwitch()
+      currentValue.value = nextValue
+      applyFullScreen(nextValue)
       context.emit('update:value', nextValue)
       context.emit('toggle', nextValue)
       context.emit('commit', {

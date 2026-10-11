@@ -59,7 +59,7 @@
 
 <script lang="ts">
 import { defineComponent, ref, shallowRef, onMounted, onBeforeUnmount, watch, computed, readonly, nextTick } from 'vue'
-import { mergeDeepRight, clone, isNil } from 'ramda'
+import { mergeDeepRight, clone, equals, isNil } from 'ramda'
 import 'monaco-editor/esm/vs/basic-languages/css/css.contribution'
 import 'monaco-editor/esm/vs/basic-languages/xml/xml.contribution'
 import 'monaco-editor/esm/vs/basic-languages/javascript/javascript.contribution'
@@ -99,6 +99,10 @@ export default defineComponent({
       type: Boolean as PropType<boolean>,
       default: true
     },
+    fullScreen: {
+      type: Boolean,
+      default: false
+    },
     zIndex: {
       // 全屏模式时，其z-index 的值
       type: Number as PropType<number>,
@@ -120,10 +124,10 @@ export default defineComponent({
       default: () => ({})
     }
   },
-  emits: ['change', 'update:modelValue', 'focuse', 'blur'],
+  emits: ['change', 'update:modelValue', 'update:monacoOptions', 'options-change', 'update:fullScreen', 'fullscreen-change', 'focuse', 'blur'],
   setup(props, context) {
     // 全屏只影响组件容器位置，不直接改变 Monaco 实例本身。
-    const isFullScreen = ref(false as any)
+    const isFullScreen = ref(props.fullScreen)
     // innerValue 是 Monaco 内部真实内容缓存，用于 needConfirm 场景下延迟提交。
     const innerValue = ref('')
     // Monaco 的 DOM 容器和 editor 实例都不需要深层响应式，shallowRef 可以避免 Vue 递归代理第三方对象。
@@ -140,6 +144,7 @@ export default defineComponent({
       monacoEditorOptions.value
       return mergeDeepRight(vmoMonacoEditorDefaultOption, monacoEditorOptions.value)
     })
+    const currentReadOnly = computed(() => props.disabled || !!computedMonacoEditorOption.value.readOnly)
     let ownedModel: Monaco.editor.ITextModel | null = null
     let mounted = false
     let reminderRevision = 0
@@ -192,13 +197,10 @@ export default defineComponent({
     // disabled 也通过 readOnly 合并进同一次 updateOptions，确保外部禁用状态立即生效。
     watch(
       () => [props.disabled, computedMonacoEditorOption.value],
-      n => {
-        if (n) {
-          monacoEditorInstance.value?.updateOptions(
-            mergeDeepRight(computedMonacoEditorOption.value, { readOnly: props.disabled })
-          )
-          // initMonacoEditor(innerValue.value)
-        }
+      () => {
+        monacoEditorInstance.value?.updateOptions(
+          mergeDeepRight(computedMonacoEditorOption.value, { readOnly: currentReadOnly.value })
+        )
       }
     )
     // theme 在 Monaco 内部是全局状态，不能只依赖 updateOptions。
@@ -255,7 +257,7 @@ export default defineComponent({
         MonacoEditorRef.value,
         mergeDeepRight(computedMonacoEditorOption.value as Monaco.editor.IStandaloneEditorConstructionOptions, {
           value: codeValue,
-          readOnly: props.disabled
+          readOnly: currentReadOnly.value
         })
       )
       const model = monacoEditorInstance.value.getModel()
@@ -310,9 +312,11 @@ export default defineComponent({
      * @param options 配置
      */
     function resetMonacoEditorOptions(options: Partial<Monaco.editor.IStandaloneEditorConstructionOptions>) {
-      monacoEditorOptions.value = mergeDeepRight(monacoEditorOptions.value, options) as Partial<
-        Monaco.editor.IStandaloneEditorConstructionOptions & { theme: 'vs-dark' | 'vs-light' }
-      >
+      const next = mergeDeepRight(monacoEditorOptions.value, options) as typeof monacoEditorOptions.value
+      if (equals(next, monacoEditorOptions.value)) return
+      monacoEditorOptions.value = next
+      context.emit('update:monacoOptions', clone(next))
+      context.emit('options-change', clone(next))
     }
     /**
      * 刷新 MonacoEditor
@@ -323,8 +327,15 @@ export default defineComponent({
     /**
      * 全屏切换
      */
+    watch(() => props.fullScreen, value => changeFullScreen(value))
+    function changeFullScreen(value: boolean) {
+      if (value === isFullScreen.value) return
+      isFullScreen.value = value
+      context.emit('update:fullScreen', value)
+      context.emit('fullscreen-change', value)
+    }
     function fullscreenSwitch() {
-      isFullScreen.value = !isFullScreen.value
+      changeFullScreen(!isFullScreen.value)
     }
     /**
      * 提交当前 Monaco 内容。
@@ -350,6 +361,7 @@ export default defineComponent({
       context,
       MonacoEditorRef,
       isFullScreen,
+      currentReadOnly,
       // theme: computedMonacoEditorOption.value.theme,
       computedMonacoEditorOption,
       innerValue,
@@ -357,6 +369,7 @@ export default defineComponent({
       mergeDeepRight,
       insertCodeString,
       fullscreenSwitch,
+      changeFullScreen,
       resetMonacoEditorOptions,
       refreshMonacoEditor,
       changeLanguage,

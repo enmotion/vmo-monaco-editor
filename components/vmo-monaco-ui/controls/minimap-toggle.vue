@@ -3,8 +3,8 @@
 </template>
 
 <script lang="ts">
-import { computed, defineComponent } from 'vue'
-import { createVmoMonacoControlProps, useVmoMonacoControl } from './use-monaco-control'
+import { defineComponent } from 'vue'
+import { createVmoMonacoControlProps, useVmoMonacoControl, useVmoMonacoControlValue } from './use-monaco-control'
 
 export type VmoMonacoMinimapControlValue = boolean
 export type VmoMonacoMinimapControlConfig = boolean
@@ -17,16 +17,15 @@ export default defineComponent({
   emits: ['update:value', 'toggle', 'commit'],
   setup(props, context) {
     const { monacos, editorOption, eachMonaco } = useVmoMonacoControl(props)
-    const currentValue = computed(() => {
-      return typeof props.value == 'boolean'
-        ? props.value
-        : typeof props.config == 'boolean'
-          ? props.config
-          : !!editorOption.value.minimap?.enabled
-    })
+    const currentValue = useVmoMonacoControlValue(
+      () => props.value ?? props.config,
+      () => !!editorOption.value.minimap?.enabled,
+      value => eachMonaco(monaco => monaco.resetMonacoEditorOptions({ minimap: { enabled: value } }))
+    )
 
     function toggleMinimap() {
       const enabled = !currentValue.value
+      currentValue.value = enabled
       eachMonaco(monaco => {
         monaco.resetMonacoEditorOptions({
           minimap: {
@@ -45,6 +44,7 @@ export default defineComponent({
     }
 
     return {
+      currentValue,
       toggleMinimap
     }
   }

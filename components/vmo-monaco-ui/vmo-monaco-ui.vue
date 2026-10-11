@@ -11,7 +11,6 @@
           <!-- 默认控件不再由 UI 容器承接事件；它们通过 inject 到的 monaco 自行调用 editor public API。 -->
           <language-select v-if="languageVisible" :config="languageControlConfig" />
           <font-size-input v-if="!!config?.fontSize" :config="fontSizeControlConfig" />
-          <preview-toggle v-if="config.preview !== false" />
           <diff-review v-if="!!config?.reviewActions" :config="reviewActionsControlConfig">
             <template v-if="$slots['review-actions']" #default="slotProps">
               <slot name="review-actions" v-bind="slotProps"></slot>
@@ -26,13 +25,37 @@
         </span>
       </slot>
     </div>
+    <div v-if="monacos.length" class="editor-state">
+      <div class="state-group">
+        <span class="state-label">内容</span>
+        <div v-if="diffMonacos.length" class="content-modes" role="group" aria-label="内容视图">
+          <button v-for="mode in contentModes" :key="mode.value" type="button"
+            :aria-pressed="currentContentMode === mode.value"
+            :title="isPreview && mode.value === 'diff' ? '退出预览并查看比对' : mode.label"
+            @click="changeContentMode(mode.value)">{{ mode.label }}</button>
+        </div>
+        <span v-else>正文</span>
+        <span v-if="!isPreview && currentContentMode === 'diff'" class="state-detail">{{ diffViewLabel }}</span>
+      </div>
+      <div class="state-group">
+        <span class="state-label">模式</span>
+        <span class="state-value">{{ interactionLabel }}</span>
+        <preview-toggle v-if="config.preview !== false" />
+      </div>
+      <div class="state-group state-settings" role="status" aria-label="当前编辑器设置">
+        <span>语言 <strong>{{ editorOption.language || 'plaintext' }}</strong></span>
+        <span>字号 <strong>{{ editorOption.fontSize || 12 }} px</strong></span>
+        <span>主题 <strong>{{ theme === 'vs-dark' ? '深色' : '浅色' }}</strong></span>
+        <span v-if="monacoNeedConfirm" class="state-pending">待确认</span>
+      </div>
+    </div>
   </div>
 </template>
 
 <style lang="css">
 /* @import url('./assets/iconfont/iconfont.css'); */
 .vmo-monaco-ui {
-  @apply h-[40px] flex flex-row items-center px-[15px] border-b border-[#88888830];
+  @apply flex flex-col px-[15px] border-b border-[#88888830] shrink-0;
 }
 .vmo-monaco-ui.dark {
   @apply bg-[#1C1C1C] text-[#FFFFFF88];
@@ -41,13 +64,13 @@
   @apply bg-[#FFFFFF] text-gray-800;
 }
 .vmo-monaco-ui .bar {
-  @apply flex flex-row grow items-center justify-between;
+  @apply flex flex-row w-full min-h-[40px] gap-[12px] flex-wrap items-center justify-between;
 }
 .vmo-monaco-ui .title {
   @apply text-xs font-bold flex-grow;
 }
 .vmo-monaco-ui .setting {
-  @apply text-xs flex flex-row items-center justify-between;
+  @apply text-xs flex flex-row flex-wrap gap-y-[8px] items-center justify-between;
 }
 .vmo-monaco-ui .iconButton {
   @apply !w-[20px] !h-[20px] shrink-0 rounded flex flex-row items-center justify-center cursor-pointer mr-[10px] last:mr-0;
@@ -67,11 +90,29 @@
 .vmo-monaco-ui .languages select {
   @apply flex-grow w-0 outline-none bg-[#88888820] border-none ml-[5px] p-[4px] border border-[#88888833] rounded;
 }
+.vmo-monaco-ui .editor-state {
+  @apply flex flex-row flex-wrap items-center gap-x-[20px] gap-y-[8px] w-full py-[8px] border-t border-[#88888820] text-xs;
+}
+.vmo-monaco-ui .state-group {
+  @apply flex flex-row flex-wrap items-center gap-[8px];
+}
+.vmo-monaco-ui .state-label, .vmo-monaco-ui .state-detail {
+  @apply opacity-70;
+}
+.vmo-monaco-ui .state-value { @apply font-medium; }
+.vmo-monaco-ui .state-settings { @apply ml-auto gap-x-[16px]; }
+.vmo-monaco-ui .state-settings strong { @apply font-medium; }
+.vmo-monaco-ui .state-pending { @apply text-amber-600; }
+.vmo-monaco-ui .content-modes { @apply flex rounded border border-[#88888833] overflow-hidden; }
+.vmo-monaco-ui .content-modes button { @apply px-[10px] py-[3px] cursor-pointer; }
+.vmo-monaco-ui .content-modes button[aria-pressed='true'] { @apply text-[#00BB55] bg-[#00BB5514] font-bold; }
+.vmo-monaco-ui button:focus-visible { @apply outline outline-2 outline-offset-2 outline-[#00BB55]; }
 </style>
 
 <script lang="ts">
 import { computed, defineComponent, provide } from 'vue'
 import type { PropType } from 'vue'
+import type { VmoMonacoDiffEditorExpose } from '@type'
 import LanguageSelect from './controls/language-select.vue'
 import FontSizeInput from './controls/font-size-input.vue'
 import ThemeToggle from './controls/theme-toggle.vue'
@@ -158,6 +199,26 @@ export default defineComponent({
     })
     const editorOption = computed(() => monacos.value[0]?.computedMonacoEditorOption || {})
     const theme = computed(() => editorOption.value.theme || 'vs-light')
+    const diffMonacos = computed(() => monacos.value.filter((target): target is VmoMonacoDiffEditorExpose =>
+      typeof (target as Partial<VmoMonacoDiffEditorExpose>)?.changeDisplayMode === 'function'))
+    const primaryDiff = computed(() => diffMonacos.value[0])
+    const isPreview = computed(() => primaryDiff.value?.currentDisplayMode === 'preview')
+    const currentContentMode = computed(() => isPreview.value
+      ? primaryDiff.value?.currentPreviewSource : primaryDiff.value?.currentDisplayMode || 'original')
+    const diffViewLabel = computed(() => primaryDiff.value?.currentDiffViewMode === 'inline' ? '行内' : '并排')
+    const interactionLabel = computed(() => isPreview.value ? '预览'
+      : (monacos.value[0]?.currentReadOnly ?? editorOption.value.readOnly) ? '只读' : '编辑')
+    const contentModes = [
+      { value: 'original', label: '正文' },
+      { value: 'modified', label: '提案' },
+      { value: 'diff', label: '比对' }
+    ] as const
+    function changeContentMode(mode: 'original' | 'modified' | 'diff') {
+      diffMonacos.value.forEach(editor => {
+        if (editor.currentDisplayMode === 'preview' && mode !== 'diff') editor.changePreviewSource(mode)
+        else editor.changeDisplayMode(mode)
+      })
+    }
     const monacoNeedConfirm = computed(() => monacos.value.some(monaco => monaco?.needConfirm))
 
     // UI config 的 true/false 主要表示是否显示控件。
@@ -187,6 +248,8 @@ export default defineComponent({
     })
 
     return {
+      monacos, editorOption, diffMonacos, contentModes, currentContentMode, isPreview,
+      diffViewLabel, interactionLabel, changeContentMode,
       theme,
       monacoNeedConfirm,
       languageVisible,

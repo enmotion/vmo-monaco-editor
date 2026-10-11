@@ -6,12 +6,7 @@ See the [complete component API reference](./api) for all props, emits, instance
 Three standalone components are exported: `VmoTextPreview`, `VmoCodePreview`, and
 `VmoMarkdownPreview`. They can be placed inside a preview slot or used on their own.
 `VmoMonacoDiffEditor` provides a `#preview` slot and a `preview` display mode.
-When the slot is supplied, the default toolbar includes a standalone plain-text
-**Preview** toggle. Click again to return to the previous editing mode. Without the
-slot, the button is hidden and preview mode is unavailable. Set UI config
-`preview: false` to hide the toggle. In a custom toolbar slot, add
-`<vmo-monaco-preview-toggle />` explicitly; it is exported as `VmoMonacoPreviewToggle`
-and also supports a direct `monaco` prop and a default slot for custom button content.
+When the slot is supplied, the status row includes a preview toggle. Click “返回编辑器” (return to editor) to restore the previous editor view. Without the slot, the toggle is hidden and preview is unavailable. UI `preview: false` hides the status-row toggle. A custom `VmoMonacoUi` default slot replaces only the upper controls, so the status row and its preview toggle remain. When building an entirely separate toolbar, use the exported `VmoMonacoPreviewToggle`, which supports a direct `monaco` prop and custom button content.
 
 ```vue
 <script setup lang="ts">
@@ -116,12 +111,9 @@ The slot receives `content` (the internal current draft, including uncommitted
 edits), `language`, `source` (`original` or `modified`), and `theme`. Use any of the
 three preview components or your own renderer inside it.
 
-Entering preview from Original selects the original draft; entering from Proposal
-or Diff selects the proposal. The preview header has plain-text Original/Proposal
-buttons for changing source without leaving preview. Set `previewSource` to
-override the entry default. Preview does not commit text or replace the two models.
-Layout/review actions and diff counts are hidden in preview; the mode switch stays
-available. Removing the slot exits preview to Proposal.
+Without an explicit `previewSource`, entering preview from Original selects the original draft; entering from Proposal or Diff selects the proposal. An explicit source prop initializes the source and synchronizes on actual external changes. Local source changes remain effective while that prop is unchanged, including on re-entry into preview. The status row and the preview source buttons switch original/proposal without leaving preview; selecting Diff in the status row exits preview. Preview does not commit text or replace the two models. Removing the slot exits preview to Proposal.
+
+Use `v-model:display-mode` and `v-model:preview-source` to track view and source, or listen to `@update:display-mode="handleMode($event)"` and `@update:preview-source="handleSource($event)"` without writing back. The editor retains `mode-change` and `preview-source-change` notifications. Neither `needConfirm` nor `bidibind` delays these state updates. Preview itself has no editable input; `currentReadOnly` describes the editor view's editing permission.
 
 The public API includes `togglePreview()`, `changeDisplayMode('preview')`,
 `changePreviewSource('original' | 'modified')`, `hasPreview`, and
@@ -129,3 +121,20 @@ The public API includes `togglePreview()`, `changeDisplayMode('preview')`,
 slot is present. An initial preview mode without a slot falls back to Proposal.
 
 
+
+
+## Preview-related slots
+
+VmoTextPreview, VmoCodePreview and VmoMarkdownPreview have no slots; supplied default or named content is not rendered. Use content for text, render for custom Markdown rendering and monacoOptions for code configuration.
+
+VmoMonacoDiffEditor's preview slot receives `{ content, language, source, theme }` and renders only in preview mode. There is no built-in preview content fallback; supply a preview component or another renderer. Only the content area is replaced, while source controls and the outer container remain. See [diff editor slots](./api#vmomonacodiffeditor) for default/prefix/suffix props.
+
+VmoMonacoPreviewToggle's default slot receives `{ active: boolean }` and replaces only text inside its existing button. The icon, click handling and accessibility attributes remain. It renders only with a preview-capable target; default text is “预览” (preview) / “返回编辑器” (return to editor). Do not nest another button.
+
+```vue
+<VmoMonacoPreviewToggle :monaco="diffRef">
+  <template #default="{ active }">
+    <span>{{ active ? 'Return to editor' : 'Preview' }}</span>
+  </template>
+</VmoMonacoPreviewToggle>
+```

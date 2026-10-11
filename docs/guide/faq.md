@@ -12,6 +12,12 @@
 
 检查 `needConfirm` 是否为 `true`。此模式应通过提交按钮或 `commit()` 更新外部绑定。`bidibind=false` 则会阻止外部值变化传入内部 model。普通编辑器的 `change` 默认在失焦时发出，并非每个键入动作。
 
+## 状态切换后父组件没有变化
+
+默认工具栏通过编辑器 API 改变内部状态；`VmoMonacoUi` 不转发控件交互事件。请在编辑器上使用 `v-model:display-mode`、`v-model:preview-source`、`v-model:diff-view-mode`、`v-model:monaco-options`、`v-model:diff-options` 和 `v-model:full-screen`，或监听对应 `update:*` 并读取 `$event`。普通编辑器支持 `monaco-options` 和 `full-screen`，没有 diff 视图状态。
+
+父组件不回写时，内部切换仍然生效；外部值实际变化才覆盖内部状态。重新赋相同值不构成外部变化，等价选项对象不会重置内部选择。`needConfirm`／`bidibind` 不控制这些状态事件。独立设置控件使用 `v-model:value`，字号与语言也支持 `v-model`。详见[工具栏状态绑定](./toolbar#状态双向绑定)。
+
 ## 为什么确认后还是原文
 
 diff 的 `confirmedValue` 是原文 model。确认只提交当前状态，不会自动接受提案。先接受需要的差异，再确认。

@@ -10,7 +10,7 @@ export function syncMonacoOptions<T extends object>(current: T, next: T, previou
     if (!Object.prototype.hasOwnProperty.call(incoming, key)) delete result[key]
   }
   for (const key of Object.keys(incoming)) {
-    if (!equals(incoming[key], before[key])) result[key] = clone(incoming[key])
+    if (!Object.prototype.hasOwnProperty.call(before, key) || !equals(incoming[key], before[key])) result[key] = clone(incoming[key])
   }
   return result as T
 }

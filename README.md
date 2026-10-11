@@ -101,6 +101,33 @@ const editorRef = ref()
 
 When `needConfirm` is `true`, editing does not emit `update:modelValue` immediately. Call `commit()` or use `VmoMonacoCommitButton` / `VmoMonacoUi` commit control to submit the internal value.
 
+## Options and fullscreen bindings
+
+Content uses `v-model`. Theme, font size, language, line numbers and minimap are fields of `monacoOptions`, returned through `v-model:monaco-options`. Fullscreen uses `v-model:full-screen`.
+
+```vue
+<script setup lang="ts">
+import { ref } from 'vue'
+import { VmoMonacoEditor, VmoMonacoUi } from 'vmo-monaco-editor'
+import type { VmoMonacoEditorOption } from 'vmo-monaco-editor'
+import 'vmo-monaco-editor/dist/style.css'
+const code = ref('SELECT * FROM users')
+const editorRef = ref()
+const editorOptions = ref<VmoMonacoEditorOption>({ language: 'sql', theme: 'vs-light', fontSize: 14 })
+const fullScreen = ref(false)
+</script>
+
+<template>
+  <VmoMonacoEditor ref="editorRef" v-model="code"
+    v-model:monaco-options="editorOptions" v-model:full-screen="fullScreen"
+    prefix="" suffix="" style="height: 400px">
+    <VmoMonacoUi :monaco="editorRef" />
+  </VmoMonacoEditor>
+</template>
+```
+
+Props initialize local state. Internal actions take effect immediately and emit updates even if the parent does not write them back. Only actual external changes override local state; equivalent option objects preserve toolbar choices. Options synchronize by top-level field, with nested objects treated as entire fields. Removing an external field removes its internal override. `needConfirm` and `bidibind` govern text submission/synchronization only; they do not delay or block option or fullscreen updates. Normal editor readonly state is `disabled || monacoOptions.readOnly`, exposed as `currentReadOnly`.
+
 ### `VmoMonacoEditor` Props
 
 | Prop | Type | Default | Description |
@@ -110,6 +137,7 @@ When `needConfirm` is `true`, editing does not emit `update:modelValue` immediat
 | `suffix` | `string` | `'};'` | Extra content displayed below the Monaco editor. It is not part of the model. |
 | `needConfirm` | `boolean` | `false` | Delay `update:modelValue` and `change` until `commit()`. |
 | `bidibind` | `boolean` | `true` | Sync external `modelValue` changes into the Monaco editor. |
+| `fullScreen` | `boolean` | `false` | Fullscreen state; supports `v-model:full-screen`. |
 | `zIndex` | `number` | `99` | Container z-index in fullscreen mode. |
 | `disabled` | `boolean` | `false` | Sets Monaco `readOnly`. |
 | `monacoOptions` | `Partial<IStandaloneEditorConstructionOptions & { theme: 'vs-dark' \| 'vs-light' }>` | `{}` | Monaco editor options. |
@@ -120,6 +148,8 @@ When `needConfirm` is `true`, editing does not emit `update:modelValue` immediat
 | Event | Payload | Description |
 | --- | --- | --- |
 | `update:modelValue` | `string` | Emitted on content change when `needConfirm=false`, or by `commit()`. |
+| `update:monacoOptions` / `options-change` | `VmoMonacoEditorOption` | Controls or API change options; independent snapshots. |
+| `update:fullScreen` / `fullscreen-change` | `boolean` | Fullscreen state actually changes. |
 | `change` | `string` | Emitted on blur when `needConfirm=false`, or by `commit()`. |
 | `focuse` | `void` | Editor focus event. |
 | `blur` | `void` | Editor blur event. |
@@ -128,6 +158,7 @@ When `needConfirm` is `true`, editing does not emit `update:modelValue` immediat
 
 ```ts
 editorRef.value.insertCodeString(code)
+editorRef.value.changeFullScreen(true)
 editorRef.value.fullscreenSwitch()
 editorRef.value.resetMonacoEditorOptions(options)
 editorRef.value.refreshMonacoEditor()
@@ -197,6 +228,37 @@ When `needConfirm=true`, normal edits and review actions update internal models 
 
 Review events such as `accept-all` and `reject-change` still emit so the host app can react to internal review operations.
 
+## Display state and two-way bindings
+
+The UI separates content (original, proposal, diff) from interaction mode (edit, readonly, preview). For compatibility the API retains four `displayMode` values; `previewSource` selects the previewed content. `disabled`, `editableOriginal` and `editableModified` determine editing permissions; `currentReadOnly` exposes the current view's editing restriction.
+
+| State | Prop / v-model | Update event |
+| --- | --- | --- |
+| Original / proposal / diff / preview | `displayMode` / `v-model:display-mode` | `update:displayMode` |
+| Preview original / proposal | `previewSource` / `v-model:preview-source` | `update:previewSource` |
+| Side-by-side / inline | `diffViewMode` / `v-model:diff-view-mode` | `update:diffViewMode` |
+| Theme / font size / language / line numbers / minimap | `monacoOptions` / `v-model:monaco-options` | `update:monacoOptions` |
+| Diff options | `diffOptions` / `v-model:diff-options` | `update:diffOptions` |
+| Fullscreen | `fullScreen` / `v-model:full-screen` | `update:fullScreen` |
+
+Props initialize local state. Internal actions update it before emitting events. Without parent writeback, local changes remain effective; actual external changes override them. `monacoOptions` and `diffOptions` synchronize by top-level field, treating nested objects as entire fields. Equivalent rerenders preserve local settings. Repeatedly setting the same internal state does not duplicate editor state update events.
+
+```vue
+<VmoMonacoDiffEditor
+  v-model:display-mode="displayMode"
+  v-model:preview-source="previewSource"
+  v-model:diff-view-mode="diffViewMode"
+  v-model:monaco-options="editorOptions"
+  v-model:diff-options="diffOptions"
+  v-model:full-screen="fullScreen">
+  <template #preview="{ content }"><pre>{{ content }}</pre></template>
+</VmoMonacoDiffEditor>
+```
+
+Define the binding variables in the parent: for example `'diff'`, `'modified'`, `'side-by-side'`, `{}`, `{}` and `false`, respectively. See the [complete toolbar binding example](docs/en/guide/toolbar.md#state-bindings). `needConfirm` delays original/proposal content submission only; all state updates remain immediate. Preview requires a `preview` slot.
+
+To receive notifications without writing back, use `:display-mode="displayMode" @update:display-mode="handleMode($event)"`. Existing `mode-change` and `preview-source-change` events remain available, alongside `diff-view-mode-change`, `options-change`, `diff-options-change` and `fullscreen-change`. Listen on the editor itself for changes initiated by the default toolbar; UI forwarding is unnecessary.
+
 ### `VmoMonacoDiffEditor` Props
 
 | Prop | Type | Default | Description |
@@ -212,6 +274,7 @@ Review events such as `accept-all` and `reject-change` still emit so the host ap
 | `editableModified` | `boolean` | `true` | Allow editing modified side/model. |
 | `needConfirm` | `boolean` | `false` | Delay value updates until `confirm()` / `commit()`. |
 | `bidibind` | `boolean` | `true` | Sync external prop changes into internal models. |
+| `fullScreen` | `boolean` | `false` | Fullscreen state; supports `v-model:full-screen`. |
 | `zIndex` | `number` | `99` | Container z-index in fullscreen mode. |
 | `disabled` | `boolean` | `false` | Readonly state for editor views. |
 | `originalUri` | `string` | `'vmo-monaco-diff-original'` | URI identity for original model. |
@@ -224,6 +287,12 @@ Review events such as `accept-all` and `reject-change` still emit so the host ap
 
 | Event | Payload | Description |
 | --- | --- | --- |
+| `update:displayMode` | Display mode string | Actual display mode changes. |
+| `update:previewSource` | original / modified | Actual preview source changes. |
+| `update:diffViewMode` / `diff-view-mode-change` | side-by-side / inline | Actual diff layout changes. |
+| `update:monacoOptions` / `options-change` | `VmoMonacoEditorOption` | Controls or API change shared options. |
+| `update:diffOptions` / `diff-options-change` | Diff options object | API changes diff options. |
+| `update:fullScreen` / `fullscreen-change` | `boolean` | Actual fullscreen state changes. |
 | `update:originalValue` | `string` | Emitted when original value is submitted. |
 | `update:modifiedValue` | `string` | Emitted when modified value is submitted. |
 | `change` | `{ originalValue: string; modifiedValue: string }` | Current pair of values. |
@@ -242,6 +311,7 @@ Review events such as `accept-all` and `reject-change` still emit so the host ap
 ```ts
 diffRef.value.resetMonacoEditorOptions(options)
 diffRef.value.resetMonacoDiffEditorOptions(options)
+diffRef.value.changeFullScreen(true)
 diffRef.value.fullscreenSwitch()
 diffRef.value.changeLanguage(language)
 diffRef.value.changeDisplayMode('diff')
@@ -290,6 +360,10 @@ For a diff editor, enable the review popover:
     fontSize: true
   }" />
 ```
+
+The persistent status row separates content (original/proposal/diff) from interaction mode (edit/readonly/preview), highlights the actual preview source and shows side-by-side/inline layout for diff. Current language, font size in px, theme and pending confirmation stay visible even when the corresponding setting controls are hidden. A custom default slot replaces only the upper controls and preserves the status row. UI config is for control visibility; the editor's props are the state bindings.
+
+Standalone setting controls support `v-model:value`, with `v-model` aliases for font size and language. They retain internal actions without parent writeback and synchronize actual external changes to the target. Control interaction events are not forwarded by `VmoMonacoUi`; editor `update:*` events are emitted directly by the editor.
 
 If `monaco` is an array, option controls apply to all targets; fullscreen switches only the first target, while preview/review controls filter for compatible targets. For `commit`, targets are committed in reverse order so the first item is treated as the primary editor and commits last.
 
@@ -407,12 +481,7 @@ import type {
 Three standalone components are exported: `VmoTextPreview`, `VmoCodePreview`, and
 `VmoMarkdownPreview`. They can be placed inside a preview slot or used on their own.
 `VmoMonacoDiffEditor` provides a `#preview` slot and a `preview` display mode.
-When the slot is supplied, the default toolbar includes a standalone plain-text
-**Preview** toggle. Click again to return to the previous editing mode. Without the
-slot, the button is hidden and preview mode is unavailable. Set UI config
-`preview: false` to hide the toggle. In a custom toolbar slot, add
-`<vmo-monaco-preview-toggle />` explicitly; it is exported as `VmoMonacoPreviewToggle`
-and also supports a direct `monaco` prop and a default slot for custom button content.
+When the slot is supplied, the status row includes a preview toggle. Click “返回编辑器” (return to editor) to restore the previous editor view. Without the slot, the toggle is hidden and preview is unavailable. UI `preview: false` hides the status-row toggle. A custom `VmoMonacoUi` default slot replaces only the upper controls, so the status row and its preview toggle remain. When building an entirely separate toolbar, use the exported `VmoMonacoPreviewToggle`, which supports a direct `monaco` prop and custom button content.
 
 ```vue
 <script setup lang="ts">
@@ -517,12 +586,9 @@ The slot receives `content` (the internal current draft, including uncommitted
 edits), `language`, `source` (`original` or `modified`), and `theme`. Use any of the
 three preview components or your own renderer inside it.
 
-Entering preview from Original selects the original draft; entering from Proposal
-or Diff selects the proposal. The preview header has plain-text Original/Proposal
-buttons for changing source without leaving preview. Set `previewSource` to
-override the entry default. Preview does not commit text or replace the two models.
-Layout/review actions and diff counts are hidden in preview; the mode switch stays
-available. Removing the slot exits preview to Proposal.
+Without an explicit `previewSource`, entering preview from Original selects the original draft; entering from Proposal or Diff selects the proposal. An explicit source prop initializes the source and synchronizes on actual external changes. Local source changes remain effective while that prop is unchanged, including on re-entry into preview. The status row and the preview source buttons switch original/proposal without leaving preview; selecting Diff in the status row exits preview. Preview does not commit text or replace the two models. Removing the slot exits preview to Proposal.
+
+Use `v-model:display-mode` and `v-model:preview-source` to track view and source, or listen to `@update:display-mode="handleMode($event)"` and `@update:preview-source="handleSource($event)"` without writing back. The editor retains `mode-change` and `preview-source-change` notifications. Neither `needConfirm` nor `bidibind` delays these state updates. Preview itself has no editable input; `currentReadOnly` describes the editor view's editing permission.
 
 The public API includes `togglePreview()`, `changeDisplayMode('preview')`,
 `changePreviewSource('original' | 'modified')`, `hasPreview`, and
@@ -557,3 +623,49 @@ npm run docs:preview
 ```
 
 Bilingual VitePress sources live in `docs/`. GitHub Pages deploys through `.github/workflows/docs.yml` on pushes to `master`.
+
+
+## Component slots
+
+| Component | Slots | Props and fallback |
+| --- | --- | --- |
+| VmoMonacoEditor | default; prefix; suffix | default: no props, toolbar above editor. prefix/suffix: `{ option }`, current merged options; fallback renders the corresponding HTML prop outside the model |
+| VmoMonacoDiffEditor | default; prefix; suffix; preview | Same editor slots; preview: `{ content, language, source, theme }`, internal draft including uncommitted edits; no built-in content renderer, only renders in preview mode |
+| VmoMonacoUi | default; review-actions | default: no props, replaces upper controls but preserves status row/injection. review-actions: review props below, replaces built-in popover content when config.reviewActions is enabled and the menu is open |
+| VmoMonacoDiffReview | default | Review props below; replaces an open popover's content while retaining trigger, container and outside-click closing |
+| VmoMonacoPreviewToggle | default | `{ active: boolean }`, current preview state; replaces button text only, retaining icon, click and accessibility behavior. Fallback: preview/return-to-editor text; hidden without a capable target |
+| VmoMonacoCommitButton, VmoMonacoFontSizeInput, VmoMonacoLanguageSelect, VmoMonacoThemeToggle, VmoMonacoFullscreenToggle, VmoMonacoLineNumbersToggle, VmoMonacoMinimapToggle | None | Supplied slot content is not rendered |
+| VmoTextPreview, VmoCodePreview, VmoMarkdownPreview | None | Use content/render/monacoOptions props instead |
+
+Review slot props are identical for UI review-actions and standalone review default:
+
+| Parameter | Type | Meaning |
+| --- | --- | --- |
+| `lineChanges` | `Monaco.editor.ILineChange[]` | Current diff blocks from the first diff target; avoid stale indexes during calculation |
+| `diffPending` | `boolean` | Whether the latest diff is still calculating |
+| `currentDisplayMode` | `Mode` | Current display mode |
+| `hasPreview` | `boolean` | Whether the first diff target provides a preview slot |
+| `acceptChange` | `(index: number) => void` | Accept a block from the current diff array |
+| `rejectChange` | `(index: number) => void` | Reject a block from the current diff array |
+| `acceptAllChanges` | `() => void` | Accept all changes |
+| `rejectAllChanges` | `() => void` | Reject all changes |
+| `changeDisplayMode` | `(mode: Mode) => void` | Switch display mode; preview applies only to preview-capable targets |
+| `changeDiffViewMode` | `(mode: ViewMode) => void` | Switch side-by-side/inline layout |
+| `confirm` | `() => void` | Confirm the current content |
+
+Destructure camelCase names even though template bindings use kebab-case. The slot does not supply `canReview`, `currentDiffViewMode` or `closePanel`. Disable bulk buttons using `diffPending || !lineChanges.length`; the methods themselves do not enforce this condition.
+
+```vue
+<VmoMonacoDiffReview :monaco="diffRef">
+  <template #default="{ lineChanges, diffPending, acceptAllChanges, rejectAllChanges, confirm }">
+    <span>{{ diffPending ? '…' : lineChanges.length }}</span>
+    <button :disabled="diffPending || !lineChanges.length" @click="rejectAllChanges()">Reject all</button>
+    <button :disabled="diffPending || !lineChanges.length" @click="acceptAllChanges()">Accept all</button>
+    <button @click="confirm()">Confirm</button>
+  </template>
+</VmoMonacoDiffReview>
+```
+
+With a custom UI default slot, review-actions is not automatically forwarded to a manually inserted review control; use that control's default slot. Prefix/suffix slots replace only their extra-content regions. Preview replaces only its content region, retaining the outer preview container/source buttons.
+
+See the per-component slot tables and examples in the [Chinese API reference](docs/guide/api.md) and [English API reference](docs/en/guide/api.md).

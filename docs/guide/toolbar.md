@@ -29,6 +29,56 @@ props、emit 与完整实例成员清单见[组件 API 完整参考](./api)。
 
 显式传入 `config` 会替代默认配置对象；请列出需要展示的控件。`needConfirm=true` 的目标会自动显示提交按钮。存在预览插槽时预览开关自动出现，`preview: false` 可隐藏它。
 
+## 当前状态与视图切换
+
+工具栏第二行持续展示两个维度：**内容**（正文／提案／比对）和**模式**（编辑／只读／预览）。比对会标明并排或行内；预览会高亮实际预览的正文或提案。预览中切换正文／提案只改变预览来源，点击比对则退出预览。预览按钮显示“返回编辑器”时，点击会恢复进入预览前的编辑器视图。
+
+绑定编辑器后，当前语言、字号（px）、主题和待确认状态会跟随实例变化显示，即使对应设置控件隐藏也可以查看。传入实例数组时，当前视图及设置以首个对应实例为准，切换作用于所有对应实例。自定义默认插槽替换上方工具栏，状态行仍然保留。
+
+## 状态双向绑定
+
+编辑器以 props 初始化内部状态。内部切换立即生效并 emit `update:*`；即使父组件不回写，也会保留内部状态。只有外部 props 的值真正变化才同步覆盖；等价对象重渲染不会重置内部设置。
+
+```vue
+<script setup lang="ts">
+import { ref } from 'vue'
+import { VmoMonacoDiffEditor, VmoMonacoUi, VmoTextPreview } from 'vmo-monaco-editor'
+import type { VmoMonacoDiffDisplayMode, VmoMonacoDiffViewMode, VmoMonacoPreviewSource, VmoMonacoEditorOption } from 'vmo-monaco-editor'
+import type { editor as MonacoEditor } from 'monaco-editor'
+import 'vmo-monaco-editor/dist/style.css'
+
+const diffRef = ref()
+const original = ref('Original text')
+const proposal = ref('Proposed text')
+const displayMode = ref<VmoMonacoDiffDisplayMode>('diff')
+const previewSource = ref<VmoMonacoPreviewSource>('modified')
+const diffViewMode = ref<VmoMonacoDiffViewMode>('side-by-side')
+const editorOptions = ref<VmoMonacoEditorOption>({ theme: 'vs-light', language: 'plaintext', fontSize: 14 })
+const diffOptions = ref<Partial<MonacoEditor.IStandaloneDiffEditorConstructionOptions>>({ ignoreTrimWhitespace: true })
+const fullScreen = ref(false)
+</script>
+
+<template>
+  <VmoMonacoDiffEditor ref="diffRef"
+    v-model:original-value="original" v-model:modified-value="proposal"
+    v-model:display-mode="displayMode"
+    v-model:preview-source="previewSource"
+    v-model:diff-view-mode="diffViewMode"
+    v-model:monaco-options="editorOptions"
+    v-model:diff-options="diffOptions"
+    v-model:full-screen="fullScreen" style="height: 500px">
+    <VmoMonacoUi :monaco="diffRef" :config="{ theme: true, fontSize: true, fullScreen: true, reviewActions: true }" />
+    <template #preview="{ content, theme }">
+      <VmoTextPreview :content="content" :theme="theme" />
+    </template>
+  </VmoMonacoDiffEditor>
+</template>
+```
+
+`editorOptions` 中的 `theme`、`fontSize`、`language`、`lineNumbers` 和 `minimap.enabled` 随工具栏操作一起回传。普通编辑器同样支持 `v-model:monaco-options` 和 `v-model:full-screen`。不需要自动回写时，可以使用 `:display-mode="displayMode" @update:display-mode="handleMode($event)"` 等形式，仅接收通知。
+
+独立控件支持 `v-model:value`；语言和字号也支持 `v-model`（`modelValue` 别名）。显式值优先于别名和配置初始化内部状态，之后内部操作不等待父组件回写。外部值变化同步到目标编辑器，直接调用编辑器 API 的变化也会反映到控件。`config` 在 UI 容器中仍表示控件配置或可见性，不是编辑器状态绑定接口。
+
 ## Config
 
 | 键 | 类型 | 说明 |
@@ -68,7 +118,7 @@ import { VmoMonacoUi, VmoMonacoCommitButton, VmoMonacoDiffReview,
 </template>
 ```
 
-在工具栏外使用控件时，直接传 `:monaco="editorRef"`。自定义默认插槽后，默认控件不会自动渲染，需要自行放入预览等控件。
+在工具栏外使用控件时，直接传 `:monaco="editorRef"`。自定义默认插槽替换上方控件，状态行仍保留，预览开关仍由 `config.preview` 控制；无需重复放入预览控件。完全自建工具栏、不使用 `VmoMonacoUi` 时，可以单独添加 `VmoMonacoPreviewToggle`。
 
 导出的独立控件：`VmoMonacoCommitButton`、`VmoMonacoFontSizeInput`、`VmoMonacoFullscreenToggle`、`VmoMonacoLanguageSelect`、`VmoMonacoLineNumbersToggle`、`VmoMonacoMinimapToggle`、`VmoMonacoDiffReview`、`VmoMonacoThemeToggle`、`VmoMonacoPreviewToggle`。控件接受 `monaco`、`config`；具体值类型由对应 `VmoMonaco*ControlValue` 导出类型定义。
 
@@ -100,7 +150,7 @@ import { VmoMonacoUi, VmoMonacoCommitButton, VmoMonacoDiffReview,
 
 ## 控件值与事件的含义
 
-独立控件还接受 `value`，支持 `v-model:value`（字号、语言也发出 `update:modelValue`）。显式值优先于编辑器推导值，绑定后需要接收更新，否则显示状态会一直跟随旧的外部值。工具栏 `config` 负责显示哪些控件，不应当作为设置编辑器初始选项的入口；初始主题、字号等应放在 `monacoOptions`。
+独立控件还接受 `value`，支持 `v-model:value`（字号、语言也发出 `update:modelValue`）。显式值用于初始化内部状态，外部真正变化时再同步；父组件不接收更新也不会阻止内部状态变化。工具栏 `config` 负责显示哪些控件，不应当作为设置编辑器初始选项的入口；初始主题、字号等应放在 `monacoOptions`。
 
 ```vue
 <VmoMonacoThemeToggle
@@ -112,3 +162,51 @@ import { VmoMonacoUi, VmoMonacoCommitButton, VmoMonacoDiffReview,
 其中 `selectedTheme` 是应用定义的 `'vs-dark' | 'vs-light'` 响应式值。普通控件的 `commit` 是操作通知，参数结构为 `{ type, value?, config?, monacoCount }`，不表示代码保存完成，也不会自动调用编辑器 `commit()`。提交按钮会先调用目标编辑器的 `commit()`，再发出同结构的操作通知；差异审阅控件发出操作通知，与编辑器本身的内容事件负载不同，详见[完整 API](./api#vmomonacodiffreview)。
 
 多实例控件通常以第一个目标的选项显示当前值，操作作用于所有目标；这不是多个状态的汇总。`null` 目标会被过滤。显式 `monaco` 目标优先于工具栏注入值；传 `null` 会回退到注入值。
+
+
+## 工具栏与控件插槽
+
+| 组件 | 插槽 | 参数与用途 |
+| --- | --- | --- |
+| VmoMonacoUi | default | 无参数；替换上方默认控件，状态行保留；内部控件仍自动注入 editor |
+| VmoMonacoUi | review-actions | 下表全部参数；替换内置审阅弹出菜单；需要默认工具栏和 config.reviewActions |
+| VmoMonacoDiffReview | default | 下表全部参数；替换该控件弹出菜单 |
+| VmoMonacoPreviewToggle | default | `{ active: boolean }`；替换按钮文字，不替换外层按钮及点击行为 |
+| 提交、字号、语言、主题、全屏、行号、小地图控件 | 无 | 没有插槽出口；传入插槽内容不会渲染 |
+
+两个审阅插槽仅在菜单打开时渲染，保留触发图标、弹出层及外部点击关闭逻辑。自定义 UI default 后，review-actions 不会自动转发给手动放入的审阅控件，应在 VmoMonacoDiffReview 上使用 default。
+
+| 参数 | 类型 | 说明 |
+| --- | --- | --- |
+| `lineChanges` | `Monaco.editor.ILineChange[]` | 首个差异目标当前差异块；计算中不要使用旧索引 |
+| `diffPending` | `boolean` | 最新差异是否仍在计算 |
+| `currentDisplayMode` | `Mode` | 当前显示模式 |
+| `hasPreview` | `boolean` | 首个差异目标是否提供预览插槽 |
+| `acceptChange` | `(index: number) => void` | 接受当前差异数组中的单块 |
+| `rejectChange` | `(index: number) => void` | 拒绝当前差异数组中的单块 |
+| `acceptAllChanges` | `() => void` | 接受全部修改 |
+| `rejectAllChanges` | `() => void` | 拒绝全部修改 |
+| `changeDisplayMode` | `(mode: Mode) => void` | 切换显示模式；preview 仅应用于有预览能力的目标 |
+| `changeDiffViewMode` | `(mode: ViewMode) => void` | 切换并排／行内布局 |
+| `confirm` | `() => void` | 确认当前内容 |
+
+参数以 camelCase 解构，尽管模板绑定写为 kebab-case。插槽不提供 `canReview`、`currentDiffViewMode` 或 `closePanel`；可用 `diffPending || !lineChanges.length` 判断批量按钮是否应禁用。方法本身不检查此禁用条件。
+
+```vue
+<VmoMonacoDiffReview :monaco="diffRef">
+  <template #default="{ lineChanges, diffPending, acceptAllChanges, rejectAllChanges, confirm }">
+    <span>{{ diffPending ? '…' : lineChanges.length }}</span>
+    <button :disabled="diffPending || !lineChanges.length" @click="rejectAllChanges()">Reject all</button>
+    <button :disabled="diffPending || !lineChanges.length" @click="acceptAllChanges()">Accept all</button>
+    <button @click="confirm()">Confirm</button>
+  </template>
+</VmoMonacoDiffReview>
+```
+
+```vue
+<VmoMonacoPreviewToggle :monaco="diffRef">
+  <template #default="{ active }">
+    <span>{{ active ? 'Return to editor' : 'Preview' }}</span>
+  </template>
+</VmoMonacoPreviewToggle>
+```

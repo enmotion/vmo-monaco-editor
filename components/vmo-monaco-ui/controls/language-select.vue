@@ -1,6 +1,6 @@
 <template>
   <span class="languages">
-    <select :value="currentValue" @change="handleChange">
+    <select aria-label="编辑器语言" title="当前语言" :value="currentValue" @change="handleChange">
       <option v-if="currentValue && !currentLanguages.includes(currentValue)" :value="currentValue" disabled>{{ currentValue }}</option>
       <option v-for="item in currentLanguages" :key="item" :value="item">{{ item }}</option>
     </select>
@@ -10,7 +10,7 @@
 <script lang="ts">
 import { computed, defineComponent } from 'vue'
 import type { PropType } from 'vue'
-import { createVmoMonacoControlProps, useVmoMonacoControl } from './use-monaco-control'
+import { createVmoMonacoControlProps, useVmoMonacoControl, useVmoMonacoControlValue } from './use-monaco-control'
 
 export type VmoMonacoLanguageControlValue = string
 export type VmoMonacoLanguageControlConfig = {
@@ -36,12 +36,15 @@ export default defineComponent({
     const currentLanguages = computed(() => {
       return props.config?.languages || props.languages
     })
-    const currentValue = computed(() => {
-      return props.value || props.modelValue || editorOption.value.language || ''
-    })
+    const currentValue = useVmoMonacoControlValue(
+      () => props.value ?? props.modelValue,
+      () => editorOption.value.language || '',
+      value => eachMonaco(monaco => monaco.changeLanguage(value))
+    )
 
     function handleChange(event: Event) {
       const language = (event.target as HTMLSelectElement).value
+      currentValue.value = language
       eachMonaco(monaco => {
         monaco.changeLanguage(language)
       })

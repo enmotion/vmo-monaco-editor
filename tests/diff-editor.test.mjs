@@ -43,7 +43,7 @@ function harness(overrides = {}, slots = {}, behavior = {}) {
   }
   const source = fs.readFileSync(new URL('../components/vmo-monaco-diff-editor/vmo-monaco-diff-editor.vue', import.meta.url), 'utf8').match(/<script lang="ts">([\s\S]*?)<\/script>/)[1]
   const context = { exports: {}, document: { createElement: () => ({}) }, requestAnimationFrame: fn => fn(), require(name) {
-    if (name === 'vue') return { ...Vue, onMounted: fn => mounted.push(fn), onBeforeUnmount: fn => unmounted.push(fn), onBeforeUpdate: fn => beforeUpdate.push(fn), getCurrentInstance: () => ({ uid: 1 }), watch(...args) { const stop = Vue.watch(...args); stops.push(stop); return stop } }
+    if (name === 'vue') return { ...Vue, onMounted: fn => mounted.push(fn), onBeforeUnmount: fn => unmounted.push(fn), onBeforeUpdate: fn => beforeUpdate.push(fn), getCurrentInstance: () => behavior.noInstance ? null : ({ uid: 1 }), watch(...args) { const stop = Vue.watch(...args); stops.push(stop); return stop } }
     if (name === 'ramda') return Ramda
     if (name.endsWith('/sync-monaco-options')) {
       const helper = { exports: {}, require: () => Ramda }
@@ -70,7 +70,7 @@ function harness(overrides = {}, slots = {}, behavior = {}) {
   const props = Vue.reactive(Object.fromEntries(Object.entries(component.props).map(([key, option]) => [key, typeof option.default === 'function' ? option.default() : option.default])))
   props.originalValue = 'old'; props.modifiedValue = 'new'
   Object.assign(props, overrides)
-  const exposed = component.setup(props, { slots, emit: (...event) => events.push(event) })
+  const exposed = component.setup(props, { slots, emit: (...event) => { events.push(event); behavior.onEvent?.(event, props) } })
   exposed.MonacoEditorRef.value = {}
   mounted.forEach(fn => fn())
   return {
@@ -137,7 +137,7 @@ test('preview selects the source draft and preserves uncommitted edits across mo
   h.exposed.changePreviewSource('modified')
   h.models[1].setValue('uncommitted proposal')
   assert.equal(h.exposed.previewContent.value, 'uncommitted proposal')
-  assert.equal(h.events.some(([name]) => name.startsWith('update:')), false)
+  assert.equal(h.events.some(([name]) => name === 'update:originalValue' || name === 'update:modifiedValue'), false)
   h.exposed.changeDisplayMode('diff')
   h.exposed.changeDisplayMode('preview')
   assert.equal(h.exposed.currentPreviewSource.value, 'modified')
@@ -158,6 +158,7 @@ test('preview requires a slot, supports explicit source and handles slot removal
   assert.equal(unavailable.exposed.currentDisplayMode.value, 'modified')
   unavailable.exposed.changeDisplayMode('preview')
   assert.equal(unavailable.exposed.currentDisplayMode.value, 'modified')
+  unavailable.updateSlots()
   unavailable.cleanup()
   const slots = { preview: () => [] }
   const h = harness({ displayMode: 'preview', previewSource: 'original' }, slots)
@@ -166,6 +167,7 @@ test('preview requires a slot, supports explicit source and handles slot removal
   h.props.previewSource = 'modified'
   await Vue.nextTick()
   assert.equal(h.exposed.previewContent.value, 'new')
+  h.updateSlots()
   delete slots.preview
   h.updateSlots()
   assert.equal(h.exposed.hasPreview.value, false)
@@ -339,4 +341,146 @@ test('diff handles empty drafts, optional configuration removal and calls after 
   h.exposed.acceptAllChanges(); h.exposed.rejectAllChanges()
   await Vue.nextTick()
   assert.equal(h.exposed.getDiffEditor(), null)
+})
+
+test('diff editor exposes v-model events for modes, settings and fullscreen without losing internal state', async () => {
+  const h = harness({ displayMode: 'original', previewSource: 'original', fullScreen: true,
+    monacoOptions: { language: 'sql', theme: 'vs-light', fontSize: 12 }, diffOptions: { ignoreTrimWhitespace: true }
+  }, { preview() {} })
+  await Vue.nextTick()
+  const e = h.exposed
+  const values = name => h.events.filter(([event]) => event === name).map(([, value]) => value)
+  e.changeDisplayMode('modified')
+  assert.deepEqual(values('update:displayMode'), ['modified'])
+  assert.equal(h.props.displayMode, 'original')
+  h.props.disabled = true
+  await Vue.nextTick()
+  assert.equal(e.currentDisplayMode.value, 'modified')
+  h.props.displayMode = 'diff'
+  await Vue.nextTick()
+  assert.equal(e.currentDisplayMode.value, 'diff')
+  e.changeDisplayMode('preview')
+  e.changePreviewSource('modified')
+  e.togglePreview(); e.togglePreview()
+  assert.equal(e.currentPreviewSource.value, 'modified', 'stale source prop must not override local source on re-entry')
+  assert.deepEqual(values('update:previewSource'), ['modified'])
+  h.props.previewSource = 'modified'
+  await Vue.nextTick()
+  h.props.previewSource = 'original'
+  await Vue.nextTick()
+  assert.equal(e.currentPreviewSource.value, 'original')
+  e.changeDiffViewMode('inline')
+  e.changeDiffViewMode('inline')
+  assert.deepEqual(values('update:diffViewMode'), ['inline'])
+  assert.deepEqual(values('diff-view-mode-change'), ['inline'])
+  h.props.diffViewMode = 'inline'
+  await Vue.nextTick()
+  h.props.diffViewMode = 'side-by-side'
+  await Vue.nextTick()
+  assert.equal(e.currentDiffViewMode.value, 'side-by-side')
+  e.fullscreenSwitch(); e.changeFullScreen(false)
+  assert.deepEqual(values('update:fullScreen'), [false])
+  h.props.fullScreen = false
+  await Vue.nextTick()
+  h.props.fullScreen = true
+  await Vue.nextTick()
+  assert.equal(e.isFullScreen.value, true)
+  e.resetMonacoEditorOptions({ theme: 'vs-dark', fontSize: 18, language: 'python' })
+  e.resetMonacoEditorOptions({ fontSize: 18 })
+  assert.equal(values('update:monacoOptions').length, 1)
+  assert.equal(values('options-change')[0].language, 'python')
+  values('update:monacoOptions')[0].fontSize = 99
+  assert.equal(e.computedMonacoEditorOption.value.fontSize, 18)
+  e.resetMonacoDiffEditorOptions({ ignoreTrimWhitespace: false })
+  e.resetMonacoDiffEditorOptions({ ignoreTrimWhitespace: false })
+  assert.equal(values('update:diffOptions').length, 1)
+  assert.equal(values('diff-options-change')[0].ignoreTrimWhitespace, false)
+  values('update:diffOptions')[0].ignoreTrimWhitespace = true
+  h.props.diffOptions = { ignoreTrimWhitespace: true }
+  h.props.monacoOptions = { language: 'sql', theme: 'vs-light', fontSize: 12 }
+  await Vue.nextTick()
+  assert.equal(e.computedMonacoEditorOption.value.language, 'python')
+  e.changeDisplayMode('diff')
+  await Vue.nextTick()
+  assert.equal(h.diff.options.ignoreTrimWhitespace, false)
+  h.props.diffOptions.ignoreTrimWhitespace = false
+  h.props.monacoOptions.fontSize = 24
+  await Vue.nextTick()
+  assert.equal(e.computedMonacoEditorOption.value.fontSize, 24)
+  assert.equal(e.computedMonacoEditorOption.value.theme, 'vs-dark')
+  h.props.previewSource = undefined
+  await Vue.nextTick()
+  h.cleanup()
+})
+
+test('readonly status follows each view and props; optional settings and repeated transitions are safe', async () => {
+  const h = harness({ displayMode: 'original', originalUri: '', modifiedUri: '' }, {}, { noInstance: true })
+  await Vue.nextTick()
+  const e = h.exposed
+  assert.equal(e.currentReadOnly.value, true)
+  e.changeDisplayMode('original')
+  e.changeDisplayMode('modified')
+  assert.equal(e.currentReadOnly.value, false)
+  h.props.disabled = true
+  assert.equal(e.currentReadOnly.value, true)
+  h.props.disabled = false
+  e.changeDisplayMode('diff')
+  assert.equal(e.currentReadOnly.value, false)
+  h.props.editableModified = false
+  assert.equal(e.currentReadOnly.value, true)
+  h.props.editableOriginal = true
+  assert.equal(e.currentReadOnly.value, false)
+  h.props.disabled = true
+  assert.equal(e.currentReadOnly.value, true)
+  h.props.previewSource = undefined
+  h.props.monacoOptions = null
+  h.props.diffOptions = null
+  await Vue.nextTick()
+  e.resetMonacoEditorOptions({ language: undefined, theme: undefined })
+  await Vue.nextTick()
+  assert.equal(e.previewLanguage.value, 'plaintext')
+  h.updateDiff()
+  h.pending(true)
+  assert.equal(e.getLineChanges().length, 0)
+  h.pending(false)
+  e.commit()
+  assert.ok(h.events.some(([name]) => name === 'confirm'))
+  h.cleanup()
+})
+
+test('diff editor v-model writeback settles without duplicate events and reflects later parent changes', async () => {
+  const h = harness({ displayMode: 'original', previewSource: 'original' }, { preview() {} }, {
+    onEvent([name, value], props) {
+      if (name.startsWith('update:')) props[name.slice(7)] = value
+    }
+  })
+  await Vue.nextTick()
+  const e = h.exposed
+  e.changeDisplayMode('preview')
+  e.changePreviewSource('modified')
+  e.changeDiffViewMode('inline')
+  e.resetMonacoEditorOptions({ language: 'markdown', fontSize: 18, theme: 'vs-light' })
+  e.resetMonacoDiffEditorOptions({ ignoreTrimWhitespace: false })
+  e.fullscreenSwitch()
+  await Vue.nextTick(); await Vue.nextTick()
+  for (const [name, value] of [['displayMode', 'preview'], ['previewSource', 'modified'], ['diffViewMode', 'inline'], ['fullScreen', true]]) {
+    assert.equal(h.props[name], value)
+    assert.equal(h.events.filter(([event]) => event === `update:${name}`).length, 1)
+  }
+  assert.equal(h.props.monacoOptions.language, 'markdown')
+  assert.equal(h.props.diffOptions.ignoreTrimWhitespace, false)
+  h.props.displayMode = 'diff'
+  h.props.diffViewMode = 'side-by-side'
+  h.props.previewSource = 'original'
+  h.props.fullScreen = false
+  h.props.monacoOptions.fontSize = 24
+  h.props.diffOptions.ignoreTrimWhitespace = true
+  await Vue.nextTick(); await Vue.nextTick()
+  assert.equal(e.currentDisplayMode.value, 'diff')
+  assert.equal(e.currentDiffViewMode.value, 'side-by-side')
+  assert.equal(e.currentPreviewSource.value, 'original')
+  assert.equal(e.isFullScreen.value, false)
+  assert.equal(e.computedMonacoEditorOption.value.fontSize, 24)
+  assert.equal(h.diff.options.ignoreTrimWhitespace, true)
+  h.cleanup()
 })

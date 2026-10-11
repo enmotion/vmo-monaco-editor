@@ -75,7 +75,13 @@ const diffRef = ref()
 
 插槽参数：`content` 是内部当前草稿，包含未提交编辑；`language` 是当前语言；`source` 为 `original` 或 `modified`；`theme` 为当前主题。预览不会提交内容或替换两个 model。
 
-从原文进入预览默认显示原文；从提案/差异进入默认显示提案。可以通过来源按钮或 `previewSource` 指定来源。没有预览插槽时开关隐藏，初始 `displayMode="preview"` 回退到提案；移除插槽也会退出预览。
+未显式指定 `previewSource` 时，从正文进入预览默认显示正文；从提案／比对进入默认显示提案。显式 `previewSource` 初始化来源，并在外部实际变化时同步；外部值不变时，内部来源切换会保留，包括再次进入预览。状态行和预览来源按钮都可切换正文／提案且不退出预览；点击状态行的比对会退出预览。
+
+用 `v-model:display-mode` 与 `v-model:preview-source` 双向绑定，或用 `@update:display-mode="handleMode($event)"`、`@update:preview-source="handleSource($event)"` 仅接收通知。原有 `mode-change`、`preview-source-change` 保留。`needConfirm` 和 `bidibind` 不延迟这些状态更新。预览本身不提供编辑输入；`currentReadOnly` 描述编辑器视图的编辑限制。
+
+自定义 `VmoMonacoUi` 默认插槽只替换上方控件，状态行及预览开关仍保留；`preview: false` 隐藏状态行预览开关。完全自建工具栏时可使用独立的 `VmoMonacoPreviewToggle`。
+
+没有预览插槽时开关隐藏，初始 `displayMode="preview"` 回退到提案；移除插槽也会退出预览。
 
 ```ts
 diffRef.value.togglePreview() // 再次切换回此前编辑视图
@@ -108,3 +114,20 @@ diffRef.value.changePreviewSource('original')
 共有变量：`--vmo-preview-color`、`--vmo-preview-background`、`--vmo-preview-font-family`、`--vmo-preview-font-size`、`--vmo-preview-line-height`、`--vmo-preview-padding`。
 
 Markdown 还支持 `--vmo-preview-block-gap`、`--vmo-preview-muted`、`--vmo-preview-border`、`--vmo-preview-link-color`、`--vmo-preview-code-font-family`、`--vmo-preview-code-background`。代码排版通过 `monacoOptions` 调整。
+
+
+## 预览相关插槽
+
+VmoTextPreview、VmoCodePreview、VmoMarkdownPreview 自身均没有插槽；传入 default 或具名插槽不会显示。用 content 传内容、用 render 自定义 Markdown 渲染、用 monacoOptions 配置代码预览。
+
+VmoMonacoDiffEditor 的 preview 插槽接收 `{ content, language, source, theme }`，仅在预览模式渲染；无内置正文回退内容，因此需要自行放入预览组件或其它 renderer。它只替换预览内容区域，来源按钮及外层容器仍由编辑器提供。default、prefix、suffix 完整参数见[差异编辑器插槽](./api#vmomonacodiffeditor)。
+
+VmoMonacoPreviewToggle 的 default 插槽接收 `{ active: boolean }`，只替换现有按钮的文字内容，外层图标、点击与可访问性属性保留。有可预览目标时才渲染；缺省文字为“预览”／“返回编辑器”，不要嵌套另一个按钮。
+
+```vue
+<VmoMonacoPreviewToggle :monaco="diffRef">
+  <template #default="{ active }">
+    <span>{{ active ? 'Return to editor' : 'Preview' }}</span>
+  </template>
+</VmoMonacoPreviewToggle>
+```

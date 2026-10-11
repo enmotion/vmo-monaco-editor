@@ -1,13 +1,17 @@
 <template>
-  <span
+  <button
+    type="button"
+    :title="currentTheme == 'vs-dark' ? '当前深色主题，切换为浅色' : '当前浅色主题，切换为深色'"
+    :aria-label="currentTheme == 'vs-dark' ? '切换为浅色主题' : '切换为深色主题'"
+    :aria-pressed="currentTheme == 'vs-dark'"
     :class="['iconButton iconfont', currentTheme == 'vs-dark' ? 'vmo-sun' : 'vmo-moon']"
-    @click="toggleTheme"></span>
+    @click="toggleTheme"></button>
 </template>
 
 <script lang="ts">
-import { computed, defineComponent } from 'vue'
+import { defineComponent } from 'vue'
 import type { PropType } from 'vue'
-import { createVmoMonacoControlProps, useVmoMonacoControl } from './use-monaco-control'
+import { createVmoMonacoControlProps, useVmoMonacoControl, useVmoMonacoControlValue } from './use-monaco-control'
 
 export type VmoMonacoThemeControlValue = 'vs-dark' | 'vs-light'
 export type VmoMonacoThemeControlConfig = VmoMonacoThemeControlValue
@@ -24,12 +28,15 @@ export default defineComponent({
   emits: ['update:value', 'toggle', 'commit'],
   setup(props, context) {
     const { monacos, editorOption, eachMonaco } = useVmoMonacoControl(props)
-    const currentTheme = computed(() => {
-      return props.value || props.theme || editorOption.value.theme || props.config || 'vs-light'
-    })
+    const currentTheme = useVmoMonacoControlValue(
+      () => props.value ?? props.theme ?? props.config,
+      () => editorOption.value.theme || 'vs-light',
+      value => eachMonaco(monaco => monaco.resetMonacoEditorOptions({ theme: value }))
+    )
 
     function toggleTheme() {
       const nextTheme: VmoMonacoThemeControlValue = currentTheme.value == 'vs-dark' ? 'vs-light' : 'vs-dark'
+      currentTheme.value = nextTheme
       eachMonaco(monaco => {
         monaco.resetMonacoEditorOptions({
           theme: nextTheme

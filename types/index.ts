@@ -25,8 +25,10 @@ export type VmoMonacoEditorOption = Partial<
 >
 
 export type VmoMonacoEditorExpose = {
+  currentReadOnly?: boolean
   resetMonacoEditorOptions: (options: VmoMonacoEditorOption) => void
   fullscreenSwitch: () => void
+  changeFullScreen: (value: boolean) => void
   changeLanguage: (language: string) => void
   commit: () => void
   computedMonacoEditorOption: VmoMonacoEditorOption

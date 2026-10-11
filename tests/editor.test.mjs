@@ -6,8 +6,8 @@ import ts from 'typescript'
 import * as Vue from 'vue'
 import * as Ramda from 'ramda'
 
-function harness(initialProps = {}) {
-  const editors = [], providers = [], events = []
+function harness(initialProps = {}, behavior = {}) {
+  const editors = [], providers = [], events = [], mounted = []
   const Monaco = {
     Range: class { constructor(sl, sc, el, ec) { Object.assign(this, { sl, sc, el, ec }) } },
     editor: {
@@ -38,7 +38,7 @@ function harness(initialProps = {}) {
   }
   const source = fs.readFileSync(new URL('../components/vmo-monaco-editor/vmo-monaco-editor.vue', import.meta.url), 'utf8').match(/<script lang="ts">([\s\S]*?)<\/script>/)[1]
   const context = { exports: {}, require(name) {
-    if (name === 'vue') return Vue
+    if (name === 'vue') return behavior.deferMount ? { ...Vue, onMounted: fn => mounted.push(fn) } : Vue
     if (name === 'ramda') return Ramda
     if (name.endsWith('/sync-monaco-options')) {
       const helper = { exports: {}, require: () => Ramda }
@@ -61,10 +61,14 @@ function harness(initialProps = {}) {
   const props = Vue.reactive(initialProps), editorRef = Vue.ref()
   const app = renderer.createApp({ render: () => Vue.h(component, { ...props, ref: editorRef,
     'onUpdate:modelValue': value => events.push(['update:modelValue', value]),
+    'onUpdate:monacoOptions': value => { events.push(['update:monacoOptions', value]); if (behavior.bindState) props.monacoOptions = value },
+    onOptionsChange: value => events.push(['options-change', value]),
+    'onUpdate:fullScreen': value => { events.push(['update:fullScreen', value]); if (behavior.bindState) props.fullScreen = value },
+    onFullscreenChange: value => events.push(['fullscreen-change', value]),
     onChange: value => events.push(['change', value]), onFocuse: () => events.push(['focuse']), onBlur: () => events.push(['blur'])
   }) })
   app.mount({})
-  return { app, props, editorRef, editors, providers, events }
+  return { app, props, editorRef, editors, providers, events, mountEditor: () => mounted.forEach(fn => fn()) }
 }
 
 test('refresh rebinds completion; unmount disposes models and pending registration', async () => {
@@ -178,5 +182,94 @@ test('editor handles empty content and unset optional theme without losing the d
   await Vue.nextTick()
   h.editorRef.value.refreshMonacoEditor()
   assert.equal(h.editors.at(-1).getValue(), '')
+  h.app.unmount()
+})
+
+test('editor emits options and fullscreen state, retains local values and accepts external updates', async () => {
+  const h = harness({ fullScreen: true, monacoOptions: { theme: 'vs-light', fontSize: 12, language: 'sql' } })
+  await Vue.nextTick()
+  const editor = h.editorRef.value
+  assert.equal(editor.isFullScreen, true)
+  editor.fullscreenSwitch()
+  assert.equal(editor.isFullScreen, false)
+  assert.equal(h.props.fullScreen, true)
+  editor.changeFullScreen(false)
+  assert.equal(h.events.filter(([e]) => e === 'update:fullScreen').length, 1)
+  h.props.fullScreen = false
+  await Vue.nextTick()
+  h.props.fullScreen = true
+  await Vue.nextTick()
+  assert.equal(editor.isFullScreen, true)
+  editor.resetMonacoEditorOptions({ theme: 'vs-dark', fontSize: 18, language: 'python' })
+  const payload = h.events.find(([e]) => e === 'update:monacoOptions')[1]
+  assert.equal(payload.theme, 'vs-dark')
+  assert.equal(payload.fontSize, 18)
+  assert.equal(payload.language, 'python')
+  payload.fontSize = 99
+  assert.equal(editor.computedMonacoEditorOption.fontSize, 18, 'event payload does not expose mutable internal state')
+  const count = h.events.filter(([e]) => e === 'update:monacoOptions').length
+  editor.resetMonacoEditorOptions({ theme: 'vs-dark', fontSize: 18, language: 'python' })
+  assert.equal(h.events.filter(([e]) => e === 'update:monacoOptions').length, count)
+  h.props.monacoOptions = { theme: 'vs-light', fontSize: 12, language: 'sql' }
+  await Vue.nextTick()
+  assert.equal(editor.computedMonacoEditorOption.fontSize, 18)
+  h.props.monacoOptions.fontSize = 24
+  await Vue.nextTick()
+  assert.equal(editor.computedMonacoEditorOption.fontSize, 24)
+  assert.equal(editor.computedMonacoEditorOption.language, 'python')
+  h.props.monacoOptions.language = 'json'
+  await Vue.nextTick()
+  assert.equal(editor.computedMonacoEditorOption.language, 'json')
+  assert.equal(h.editors[0].model.language, 'json')
+  h.app.unmount()
+})
+
+test('ordinary editor handles external changes before initialization and absent option values', async () => {
+  const h = harness({ modelValue: 'before' }, { deferMount: true })
+  h.props.modelValue = 'external before mount'
+  await Vue.nextTick()
+  assert.equal(h.editors[0].value, 'external before mount')
+  h.props.monacoOptions = null
+  await Vue.nextTick()
+  h.editorRef.value.resetMonacoEditorOptions({ theme: undefined, language: undefined })
+  await Vue.nextTick()
+  h.mountEditor()
+  await Vue.nextTick()
+  h.app.unmount()
+})
+
+test('ordinary editor supports parent v-model writeback without duplicate updates', async () => {
+  const h = harness({ monacoOptions: { fontSize: 12 }, fullScreen: false }, { bindState: true })
+  await Vue.nextTick()
+  h.editorRef.value.resetMonacoEditorOptions({ fontSize: 18, theme: 'vs-light', language: 'sql' })
+  h.editorRef.value.fullscreenSwitch()
+  await Vue.nextTick(); await Vue.nextTick()
+  assert.equal(h.props.monacoOptions.fontSize, 18)
+  assert.equal(h.editorRef.value.computedMonacoEditorOption.fontSize, 18)
+  assert.equal(h.props.fullScreen, true)
+  assert.equal(h.events.filter(([e]) => e === 'update:monacoOptions').length, 1)
+  assert.equal(h.events.filter(([e]) => e === 'update:fullScreen').length, 1)
+  h.props.monacoOptions.fontSize = 24
+  await Vue.nextTick()
+  assert.equal(h.editorRef.value.computedMonacoEditorOption.fontSize, 24)
+  h.app.unmount()
+})
+
+test('ordinary editor readonly status and Monaco options follow disabled and readOnly props', async () => {
+  const h = harness({ disabled: false, monacoOptions: { readOnly: true } })
+  await Vue.nextTick()
+  assert.equal(h.editorRef.value.currentReadOnly, true)
+  assert.equal(h.editors[0].options.readOnly, true)
+  h.props.monacoOptions.readOnly = false
+  await Vue.nextTick()
+  assert.equal(h.editorRef.value.currentReadOnly, false)
+  assert.equal(h.editors[0].options.readOnly, false)
+  h.props.disabled = true
+  await Vue.nextTick()
+  assert.equal(h.editorRef.value.currentReadOnly, true)
+  assert.equal(h.editors[0].options.readOnly, true)
+  h.props.disabled = false
+  await Vue.nextTick()
+  assert.equal(h.editorRef.value.currentReadOnly, false)
   h.app.unmount()
 })

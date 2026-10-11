@@ -1,4 +1,4 @@
-import { computed, inject, ref, unref } from 'vue'
+import { computed, inject, ref, unref, watch } from 'vue'
 import type { ComputedRef, InjectionKey, PropType, Ref } from 'vue'
 import type { VmoMonacoEditorExpose } from '@type'
 
@@ -27,7 +27,7 @@ export const VMO_MONACO_EDITOR_KEY: InjectionKey<VmoMonacoControlTargetRef> = Sy
  * TConfig: 当前控件自己的配置类型，例如 fontSize 的 min/max/step。
  *
  * 三个通用 props 的约定：
- * - value: 外部受控值，优先级最高，适合把 control 用在非 Monaco 或受控场景。
+ * - value: 初始化内部值；外部实际改变时同步，内部操作无需等待父组件回写。
  * - config: 控件专属配置，不在公共层定义具体结构。
  * - monaco: 显式注入 editor 实例；如果不传，则尝试从 vmo-monaco-ui inject。
  */
@@ -81,4 +81,15 @@ export function useVmoMonacoControl(props: { monaco?: VmoMonacoControlTarget }) 
     editorOption,
     eachMonaco
   }
+}
+
+/** Keep local changes until an external value actually changes; also follow editor API changes. */
+export function useVmoMonacoControlValue<T>(external: () => T | undefined, fallback: () => T, apply: (value: T) => void) {
+  const current = ref<T>(external() ?? fallback()) as Ref<T>
+  watch(fallback, value => { current.value = value }, { flush: 'sync' })
+  watch(external, value => {
+    current.value = value ?? fallback()
+    if (value !== undefined) apply(value)
+  }, { immediate: true, flush: 'sync' })
+  return current
 }

@@ -18,3 +18,10 @@ test('option sync removes deleted external keys and preserves internally changed
   previous.minimap.enabled = false
   assert.equal(initial.minimap.enabled, true)
 })
+
+test('new explicit undefined options count as an external change', () => {
+  const { syncMonacoOptions } = createLibraryLoader()('use.lib/sync-monaco-options.ts')
+  const result = syncMonacoOptions({ language: 'sql' }, { language: undefined }, {})
+  assert.equal(Object.hasOwn(result, 'language'), true)
+  assert.equal(result.language, undefined)
+})

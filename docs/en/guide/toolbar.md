@@ -36,6 +36,48 @@ For a diff editor, enable the review popover:
 
 If `monaco` is an array, option controls apply to all targets; fullscreen switches only the first target, and preview/review controls filter for compatible targets. For `commit`, targets are committed in reverse order so the first item is treated as the primary editor and commits last.
 
+## State bindings
+
+With an attached editor, the persistent second row separates content (original, proposal, diff) from interaction mode (edit, readonly, preview), and displays current language, font size, theme and pending confirmation. Diff shows side-by-side or inline layout, and preview highlights its actual source. Preview content switches preserve preview; selecting diff returns to the editor. The preview toggle reads “返回编辑器” (return to editor) while active and restores the previous editor view. Current language, font size in px and theme remain visible even when their setting controls are hidden. A custom default slot replaces the upper controls while retaining this status row; `preview: false` hides the status-row preview toggle.
+
+```vue
+<script setup lang="ts">
+import { ref } from 'vue'
+import { VmoMonacoDiffEditor, VmoMonacoUi, VmoTextPreview } from 'vmo-monaco-editor'
+import type { VmoMonacoDiffDisplayMode, VmoMonacoDiffViewMode, VmoMonacoPreviewSource, VmoMonacoEditorOption } from 'vmo-monaco-editor'
+import type { editor as MonacoEditor } from 'monaco-editor'
+import 'vmo-monaco-editor/dist/style.css'
+
+const diffRef = ref()
+const original = ref('Original text')
+const proposal = ref('Proposed text')
+const displayMode = ref<VmoMonacoDiffDisplayMode>('diff')
+const previewSource = ref<VmoMonacoPreviewSource>('modified')
+const diffViewMode = ref<VmoMonacoDiffViewMode>('side-by-side')
+const editorOptions = ref<VmoMonacoEditorOption>({ theme: 'vs-light', language: 'plaintext', fontSize: 14 })
+const diffOptions = ref<Partial<MonacoEditor.IStandaloneDiffEditorConstructionOptions>>({ ignoreTrimWhitespace: true })
+const fullScreen = ref(false)
+</script>
+
+<template>
+  <VmoMonacoDiffEditor ref="diffRef"
+    v-model:original-value="original" v-model:modified-value="proposal"
+    v-model:display-mode="displayMode"
+    v-model:preview-source="previewSource"
+    v-model:diff-view-mode="diffViewMode"
+    v-model:monaco-options="editorOptions"
+    v-model:diff-options="diffOptions"
+    v-model:full-screen="fullScreen" style="height: 500px">
+    <VmoMonacoUi :monaco="diffRef" :config="{ theme: true, fontSize: true, fullScreen: true, reviewActions: true }" />
+    <template #preview="{ content, theme }">
+      <VmoTextPreview :content="content" :theme="theme" />
+    </template>
+  </VmoMonacoDiffEditor>
+</template>
+```
+
+Preview requires a `preview` slot. Theme, font size, language, line numbers and minimap are fields of `editorOptions`. The normal editor supports `v-model:monaco-options` and `v-model:full-screen` too. Props initialize internal state; internal actions update immediately and emit `update:*`. Actual external changes override local state, while equivalent option objects preserve it. Standalone controls support `v-model:value`; font size and language also support `v-model`. Toolbar `config` controls visibility and control configuration; it is not the editor state binding interface. For notification-only usage, use `:display-mode="displayMode" @update:display-mode="handleMode($event)"`. Listen on the editor for `update:*` state events; UI does not forward individual control interaction events.
+
 ### UI Config
 
 | Key | Type | Description |
@@ -126,8 +168,56 @@ An explicit `config` replaces the default config object. Editors with `needConfi
 
 ## Controlled values and event meaning
 
-Standalone controls also accept `value` and support `v-model:value`; font size and language additionally emit `update:modelValue`. An explicit value takes priority over editor-derived state, so handle updates to keep the displayed state current. Toolbar config chooses visible controls; put initial editor theme, font size and other options in `monacoOptions`.
+Standalone controls also accept `value` and support `v-model:value`; font size and language additionally emit `update:modelValue`. An explicit value initializes local state and synchronizes when it actually changes. Internal actions remain effective even when the parent does not write emitted values back. Toolbar config chooses visible controls; put initial editor theme, font size and other options in `monacoOptions`.
 
 Ordinary control `commit` events report an interaction with `{ type, value?, config?, monacoCount }`. They do not report saved code or automatically call the editor's `commit()`. The commit button calls target editors’ `commit()` methods before emitting the same interaction payload. Diff review control events report interactions with type, value, config, monacoCount, index, lineChanges and an optional mode; they differ from diff editor content events.
 
 For multiple targets, displayed option values usually come from the first target while option actions apply to all targets (fullscreen uses only the first); they do not summarize mixed states. Null array entries are filtered. An explicit non-null `monaco` takes priority over toolbar injection; null falls back to the injected target.
+
+
+## Toolbar and control slots
+
+| Component | Slot | Props and purpose |
+| --- | --- | --- |
+| VmoMonacoUi | default | No props; replaces upper controls, preserves status row and injected editor context |
+| VmoMonacoUi | review-actions | All props below; replaces built-in review menu; requires default toolbar and config.reviewActions |
+| VmoMonacoDiffReview | default | All props below; replaces this control's review menu |
+| VmoMonacoPreviewToggle | default | `{ active: boolean }`; replaces button text, not the outer button or click behavior |
+| Commit, font size, language, theme, fullscreen, line number, minimap controls | None | No slot outlets; supplied slot content is not rendered |
+
+Both review slots render only while the menu is open, retaining the trigger, popover and outside-click closing behavior. With a custom UI default slot, review-actions is not forwarded to manually inserted review controls; use VmoMonacoDiffReview's default slot instead.
+
+| Parameter | Type | Meaning |
+| --- | --- | --- |
+| `lineChanges` | `Monaco.editor.ILineChange[]` | Current diff blocks from the first diff target; avoid stale indexes during calculation |
+| `diffPending` | `boolean` | Whether the latest diff is still calculating |
+| `currentDisplayMode` | `Mode` | Current display mode |
+| `hasPreview` | `boolean` | Whether the first diff target provides a preview slot |
+| `acceptChange` | `(index: number) => void` | Accept a block from the current diff array |
+| `rejectChange` | `(index: number) => void` | Reject a block from the current diff array |
+| `acceptAllChanges` | `() => void` | Accept all changes |
+| `rejectAllChanges` | `() => void` | Reject all changes |
+| `changeDisplayMode` | `(mode: Mode) => void` | Switch display mode; preview applies only to preview-capable targets |
+| `changeDiffViewMode` | `(mode: ViewMode) => void` | Switch side-by-side/inline layout |
+| `confirm` | `() => void` | Confirm the current content |
+
+Destructure camelCase names even though template bindings use kebab-case. The slot does not supply `canReview`, `currentDiffViewMode` or `closePanel`. Disable bulk buttons using `diffPending || !lineChanges.length`; the methods themselves do not enforce this condition.
+
+```vue
+<VmoMonacoDiffReview :monaco="diffRef">
+  <template #default="{ lineChanges, diffPending, acceptAllChanges, rejectAllChanges, confirm }">
+    <span>{{ diffPending ? '…' : lineChanges.length }}</span>
+    <button :disabled="diffPending || !lineChanges.length" @click="rejectAllChanges()">Reject all</button>
+    <button :disabled="diffPending || !lineChanges.length" @click="acceptAllChanges()">Accept all</button>
+    <button @click="confirm()">Confirm</button>
+  </template>
+</VmoMonacoDiffReview>
+```
+
+```vue
+<VmoMonacoPreviewToggle :monaco="diffRef">
+  <template #default="{ active }">
+    <span>{{ active ? 'Return to editor' : 'Preview' }}</span>
+  </template>
+</VmoMonacoPreviewToggle>
+```

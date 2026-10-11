@@ -1,4 +1,6 @@
 import { test } from 'node:test'
+import { createLibraryLoader } from './helpers/load-library.mjs'
+const controlValueHelper = createLibraryLoader()('components/vmo-monaco-ui/controls/use-monaco-control.ts').useVmoMonacoControlValue
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import { transpileModule, runInNewContext } from './helpers/source-runtime.mjs'
@@ -41,7 +43,7 @@ test('language select displays the current model language outside the configured
   const target = Vue.reactive({ computedMonacoEditorOption: { language: 'plaintext' }, changeLanguage(language) { this.computedMonacoEditorOption.language = language } })
   const events = []
   const component = load('components/vmo-monaco-ui/controls/language-select.vue', () => ({
-    createVmoMonacoControlProps: () => ({ config: Object }),
+    useVmoMonacoControlValue: controlValueHelper, createVmoMonacoControlProps: () => ({ config: Object }),
     useVmoMonacoControl: () => ({ monacos: Vue.ref([target]), editorOption: Vue.computed(() => target.computedMonacoEditorOption), eachMonaco: fn => fn(target) })
   }))
   const html = await renderToString(Vue.h(component, { config: { languages: ['sql', 'javascript'] } }))

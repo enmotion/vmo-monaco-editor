@@ -163,3 +163,90 @@ test('review control dispatches actions only to diff targets and removes outside
   control.togglePanel(); cleanup.forEach(fn => fn())
   assert.equal(listeners.size, 0)
 })
+
+test('all setting controls retain local changes without parent writeback and accept real external changes', () => {
+  const cases = [
+    ['theme-toggle', 'currentTheme', 'theme', 'vs-light', 'vs-dark', c => c.toggleTheme()],
+    ['line-numbers-toggle', 'currentValue', 'lineNumbers', 'on', 'off', c => c.toggleLineNumbers()],
+    ['minimap-toggle', 'currentValue', 'minimap', false, true, c => c.toggleMinimap()],
+    ['font-size-input', 'currentValue', 'fontSize', 12, 18, c => c.handleInput({ target: { value: '18' } })],
+    ['language-select', 'currentValue', 'language', 'sql', 'python', c => c.handleChange({ target: { value: 'python' } })]
+  ]
+  for (const [name, state, property, initial, local, act] of cases) {
+    const a = target(), events = [], scope = Vue.effectScope()
+    a.changeLanguage = language => a.resetMonacoEditorOptions({ language })
+    const load = createLibraryLoader({ vue: { ...Vue, inject: () => Vue.ref(a) } })
+    const props = Vue.reactive({ value: initial, unrelated: 0 })
+    const control = scope.run(() => load(`components/vmo-monaco-ui/controls/${name}.vue`).default.setup(props, { emit: (...e) => events.push(e) }))
+    const actual = () => property === 'minimap' ? a.computedMonacoEditorOption.minimap.enabled : a.computedMonacoEditorOption[property]
+    assert.equal(actual(), initial, `${name}: initialize target from props`)
+    act(control)
+    assert.equal(props.value, initial)
+    assert.equal(control[state].value, local)
+    assert.equal(actual(), local)
+    assert.ok(events.some(([event, value]) => event === 'update:value' && value === local))
+    props.unrelated++
+    props.value = initial
+    assert.equal(control[state].value, local, `${name}: unchanged props must retain local state`)
+    const external = typeof initial === 'boolean' ? local : name === 'font-size-input' ? 24 : name === 'language-select' ? 'json' : local
+    props.value = external
+    assert.equal(control[state].value, external)
+    props.value = initial
+    assert.equal(control[state].value, initial)
+    assert.equal(actual(), initial)
+    const before = events.length
+    props.value = undefined
+    assert.equal(control[state].value, initial)
+    assert.equal(events.length, before, 'external sync does not echo control interaction events')
+    a.resetMonacoEditorOptions(property === 'minimap' ? { minimap: { enabled: local } } : { [property]: local })
+    assert.equal(control[state].value, local, 'direct editor changes are reflected')
+    scope.stop()
+  }
+})
+
+test('control aliases and local state work without an editor', () => {
+  const scope = Vue.effectScope(), load = createLibraryLoader({ vue: { ...Vue, inject: () => Vue.ref(null) } })
+  scope.run(() => {
+    const props = Vue.reactive({ modelValue: 14 })
+    const font = load('components/vmo-monaco-ui/controls/font-size-input.vue').default.setup(props, { emit() {} })
+    font.handleInput({ target: { value: '20' } })
+    assert.equal(font.currentValue.value, 20)
+    props.modelValue = 16
+    assert.equal(font.currentValue.value, 16)
+    const languageProps = Vue.reactive({ modelValue: 'sql' })
+    const language = load('components/vmo-monaco-ui/controls/language-select.vue').default.setup(languageProps, { emit() {} })
+    language.handleChange({ target: { value: 'json' } })
+    assert.equal(language.currentValue.value, 'json')
+    languageProps.modelValue = 'python'
+    assert.equal(language.currentValue.value, 'python')
+    const themeProps = Vue.reactive({ theme: 'vs-light' })
+    const theme = load('components/vmo-monaco-ui/controls/theme-toggle.vue').default.setup(themeProps, { emit() {} })
+    theme.toggleTheme(); theme.toggleTheme()
+    assert.equal(theme.currentTheme.value, 'vs-light')
+    themeProps.theme = 'vs-dark'
+    assert.equal(theme.currentTheme.value, 'vs-dark')
+  })
+  scope.stop()
+})
+
+test('fullscreen props and internal actions set the actual target state', () => {
+  const a = target(), scope = Vue.effectScope(), load = createLibraryLoader({ vue: { ...Vue, inject: () => Vue.ref(a) } })
+  const props = Vue.reactive({ value: true })
+  const events = []
+  const control = scope.run(() => load('components/vmo-monaco-ui/controls/fullscreen-toggle.vue').default.setup(props, { emit: (...e) => events.push(e) }))
+  assert.equal(a.isFullScreen, true)
+  control.toggleFullScreen()
+  assert.equal(control.currentValue.value, false)
+  assert.equal(a.isFullScreen, false)
+  control.toggleFullScreen()
+  assert.equal(a.isFullScreen, true)
+  props.value = false
+  assert.equal(a.isFullScreen, false)
+  props.value = true
+  assert.equal(a.isFullScreen, true)
+  props.value = undefined
+  a.fullscreenSwitch()
+  assert.equal(control.currentValue.value, false)
+  assert.equal(events.filter(([e]) => e === 'update:value').length, 2)
+  scope.stop()
+})

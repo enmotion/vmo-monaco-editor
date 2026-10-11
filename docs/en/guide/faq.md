@@ -12,6 +12,12 @@ Enable the Monaco worker plugin in your Vite app. Verify production worker files
 
 With `needConfirm=true`, edits stay internal until `commit()` (or diff `confirm()`). With `bidibind=false`, external changes are not synchronized into the internal model. The normal editor's `change` event fires on blur by default, while `update:modelValue` fires during editing.
 
+## State changes do not update the parent
+
+The default toolbar changes state through editor APIs; `VmoMonacoUi` does not forward control interaction events. Bind on the editor with `v-model:display-mode`, `v-model:preview-source`, `v-model:diff-view-mode`, `v-model:monaco-options`, `v-model:diff-options` and `v-model:full-screen`, or listen to the corresponding `update:*` events and read `$event`. The normal editor supports `monaco-options` and `full-screen`, with no diff view state.
+
+Without parent writeback, local changes remain effective. Only actual external changes override them: assigning the same value or an equivalent options object does not reset local choices. `needConfirm`/`bidibind` do not control state events. Standalone setting controls support `v-model:value`; font size and language also support `v-model`. See [toolbar state bindings](./toolbar#state-bindings).
+
 ## Confirming does not accept proposals
 
 The diff `confirmedValue` is the original model. Accept the desired differences before confirming; confirmation does not implicitly accept remaining proposals or save to a backend.
