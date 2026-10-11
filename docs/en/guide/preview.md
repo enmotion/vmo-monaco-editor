@@ -28,7 +28,7 @@ See the [complete component API reference](./api) for all props, emits, instance
 Three standalone components are exported: `VmoTextPreview`, `VmoCodePreview`, and
 `VmoMarkdownPreview`. They can be placed inside a preview slot or used on their own.
 `VmoMonacoDiffEditor` provides a `#preview` slot and a `preview` display mode.
-When the slot is supplied, the status row includes a preview toggle. Click “返回编辑器” (return to editor) to restore the previous editor view. Without the slot, the toggle is hidden and preview is unavailable. UI `preview: false` hides the status-row toggle. A custom `VmoMonacoUi` default slot replaces only the upper controls, so the status row and its preview toggle remain. When building an entirely separate toolbar, use the exported `VmoMonacoPreviewToggle`, which supports a direct `monaco` prop and custom button content.
+The default toolbar includes an icon-only preview toggle when a preview slot exists; `config.preview: false` hides it. Its hover hint and pressed state indicate the current view. A custom toolbar slot replaces all default controls; include `VmoMonacoPreviewToggle` there when needed.
 
 ```vue
 <script setup lang="ts">
@@ -133,7 +133,7 @@ The slot receives `content` (the internal current draft, including uncommitted
 edits), `language`, `source` (`original` or `modified`), and `theme`. Use any of the
 three preview components or your own renderer inside it.
 
-Without an explicit `previewSource`, entering preview from Original selects the original draft; entering from Proposal or Diff selects the proposal. An explicit source prop initializes the source and synchronizes on actual external changes. Local source changes remain effective while that prop is unchanged, including on re-entry into preview. The status row changes editMode independently; the preview source buttons change previewSource without leaving preview. Preview does not commit text or replace the two models. Removing the slot returns to edit and preserves editMode.
+Without an explicit `previewSource`, entering preview from Original selects the original draft; entering from Proposal or Diff selects the proposal. An explicit source prop initializes the source and synchronizes on actual external changes. Local source changes remain effective while that prop is unchanged, including on re-entry into preview. Changing editMode preserves viewMode; the preview source buttons change previewSource without leaving preview. Preview does not commit text or replace the two models. Removing the slot returns to edit and preserves editMode.
 
 Use `v-model:view-mode` and `v-model:preview-source` to track view and source, or listen to `@update:view-mode="handleMode($event)"` and `@update:preview-source="handleSource($event)"` without writing back. The editor emits `view-mode-change` and `preview-source-change` notifications independently. Neither `needConfirm` nor `bidibind` delays these state updates. Preview itself has no editable input; `currentReadOnly` describes the editor view's editing permission.
 
@@ -151,7 +151,7 @@ VmoTextPreview, VmoCodePreview and VmoMarkdownPreview have no slots; supplied de
 
 VmoMonacoDiffEditor's preview slot receives `{ content, language, source, theme }` and renders only in preview mode. There is no built-in preview content fallback; supply a preview component or another renderer. Only the content area is replaced, while source controls and the outer container remain. See [diff editor slots](./api#vmomonacodiffeditor) for default/prefix/suffix props.
 
-VmoMonacoPreviewToggle's default slot receives `{ active: boolean }` and replaces only text inside its existing button. The icon, click handling and accessibility attributes remain. It renders only with a preview-capable target; default text is “预览” (preview) / “返回编辑器” (return to editor). Do not nest another button.
+VmoMonacoPreviewToggle's default slot receives `{ active: boolean }` and customizes content inside its existing button. The icon, click handling and accessibility attributes remain. It renders only with a preview-capable target; the default shows an icon with hover hints and pressed state. Do not nest another button.
 
 ```vue
 <VmoMonacoPreviewToggle :monaco="diffRef">

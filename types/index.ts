@@ -1,5 +1,6 @@
 import type { VmoMonacoViewMode, VmoMonacoDiffEditMode, VmoMonacoPreviewSource } from '../components/vmo-monaco-diff-editor/types'
 import type * as Monaco from 'monaco-editor'
+import type { VNode } from 'vue'
 
 export type VmoMonacoContext = {
   types: string[]
@@ -23,6 +24,19 @@ export type VmoMonacoContextMethod = {
 export type VmoMonacoEditorOption = Partial<
   Monaco.editor.IStandaloneEditorConstructionOptions & { theme: 'vs-dark' | 'vs-light' }
 >
+
+/** Shared slot contract; the ordinary editor always previews the original draft. */
+export type VmoMonacoEditorSlots<Source extends VmoMonacoPreviewSource = VmoMonacoPreviewSource> = {
+  default?: (props: { viewMode: VmoMonacoViewMode }) => VNode[]
+  prefix?: (props: { option: VmoMonacoEditorOption }) => VNode[]
+  suffix?: (props: { option: VmoMonacoEditorOption }) => VNode[]
+  preview?: (props: {
+    content: string
+    language: string
+    source: Source
+    theme: VmoMonacoEditorOption['theme']
+  }) => VNode[]
+}
 
 export type VmoMonacoEditorExpose = {
   currentViewMode: VmoMonacoViewMode

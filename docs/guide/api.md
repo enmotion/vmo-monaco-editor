@@ -9,6 +9,8 @@
 
 两个编辑器的插槽一致：`default`、`prefix`、`preview`、`suffix`。preview 参数为 `{ content, language, source, theme }`，普通编辑器的 source 固定为 original。没有 preview 插槽时无法进入预览；移除插槽会返回 edit，保留差异编辑器的 editMode。普通编辑器切换时保留 Monaco 实例和草稿。
 
+库导出 `VmoMonacoEditorSlots<Source>` 插槽类型，默认 Source 为 `original | modified`；普通编辑器使用 `VmoMonacoEditorSlots<'original'>`。各插槽为可选函数，参数对象本身不包含 undefined，支持模板中直接解构 `{ content, theme }`。
+
 ```vue
 <VmoMonacoEditor v-model="body" v-model:view-mode="viewMode">
   <template #preview="{ content, language, source, theme }">
@@ -114,7 +116,7 @@
 
 | 名称 | 参数 | 默认内容与渲染条件 |
 | --- | --- | --- |
-| `default` | 无 | 位于编辑器上方，可放工具栏；未提供时不渲染此区域 |
+| `default` | `{ viewMode: ViewMode }` | 位于编辑器上方，可放工具栏；未提供时不渲染此区域 |
 | `prefix` | `{ option: VmoMonacoEditorOption }` | 替换上方附加内容；未提供插槽时用 `v-html` 渲染 prefix prop。插槽存在或 prefix 非空时渲染 |
 | `suffix` | `{ option: VmoMonacoEditorOption }` | 替换下方附加内容；未提供插槽时用 `v-html` 渲染 suffix prop。插槽存在或 suffix 非空时渲染 |
 | `preview` | `{ content: string; language: string; source: 'original'; theme: Theme }` | 当前草稿，仅在 preview 状态渲染，无内置渲染器。 |
@@ -245,7 +247,7 @@
 
 | 名称 | 参数 | 默认内容与渲染条件 |
 | --- | --- | --- |
-| `default` | 无 | 位于编辑器上方，可放工具栏；未提供时不渲染此区域 |
+| `default` | `{ viewMode: ViewMode }` | 位于编辑器上方，可放工具栏；未提供时不渲染此区域 |
 | `prefix` | `{ option: VmoMonacoEditorOption }` | 替换上方附加内容；未提供插槽时用 `v-html` 渲染 prefix prop。插槽存在或 prefix 非空时渲染 |
 | `suffix` | `{ option: VmoMonacoEditorOption }` | 替换下方附加内容；未提供插槽时用 `v-html` 渲染 suffix prop。插槽存在或 suffix 非空时渲染 |
 | `preview` | `{ content: string; language: string; source: Source; theme: Theme }` | 仅在 currentViewMode 为 preview 时渲染；提供此插槽才有预览能力，无内置正文渲染器 |
@@ -299,11 +301,11 @@
 
 只有语言列表多于一个选项才会显示选择器。`language: false` 显式隐藏选择器；当前语言不在列表内时会显示禁用的当前项。工具栏选择会在父组件以等价内联配置重渲染时保留；真正改变外部语言选项仍会同步生效。
 
-状态行常驻展示内容、模式、当前语言、字号（px）、主题及待确认状态。隐藏设置控件不隐藏当前设置；自定义默认插槽不替换状态行。`config.fullScreen` 控制按钮可见性，编辑器的 `fullScreen` prop 才是可绑定状态。
+状态通过现有控件的当前值、选中态和提示表达。default 插槽完整替换默认工具栏。`config.fullScreen` 控制按钮可见性，编辑器的 `fullScreen` prop 控制状态。
 
 ### Emits 与实例方法
 
-没有自定义 emit。内部控件的交互事件不会由 UI 自动转发；需要监听时使用自定义默认插槽中的控件。编辑器状态变化则直接监听编辑器自身的 `update:*` 事件。`changeContentMode(mode)` 支持 original／modified／diff：始终只改变 editMode，不退出预览；previewSource 单独控制预览来源，作用于全部差异目标。
+没有自定义 emit。内部控件的交互事件不会由 UI 自动转发；需要监听时使用自定义默认插槽中的控件。编辑器状态变化则直接监听编辑器自身的 `update:*` 事件。
 
 ### 实例属性
 
@@ -311,12 +313,6 @@
 | --- | --- | --- |
 | `monacos` | Target[] | 当前编辑器目标数组 |
 | `editorOption` | Option | 首个目标的当前配置 |
-| `diffMonacos` | VmoMonacoDiffEditorExpose[] | 可切换显示模式的差异目标 |
-| `contentModes` | 模式描述数组 | 正文／提案／比对的值和标签 |
-| `currentContentMode` | original / modified / diff | 当前内容；预览时为实际预览来源 |
-| `isPreview` | boolean | 当前是否预览 |
-| `diffViewLabel` | string | 并排／行内文字 |
-| `interactionLabel` | string | 编辑／只读／预览文字 |
 | `theme` | Theme | 第一个目标的主题，回退 vs-light |
 | `monacoNeedConfirm` | boolean | 是否有目标需要手动提交 |
 | `languageVisible` | boolean | 语言列表多于一项且未显式隐藏 |
@@ -330,9 +326,11 @@
 
 ### 插槽
 
+编辑器承载工具栏的 default 插槽与 `VmoMonacoUi` 的 default 插槽都接收 `{ viewMode }`，值为内部实际生效的 edit／preview 状态，不依赖父组件回写。UI 使用首个目标；没有目标时回退 edit。
+
 | 名称 | 参数 | 默认内容与渲染条件 |
 | --- | --- | --- |
-| `default` | 无 | 替换上方标题及默认控件组合；下方状态行和 provide 的编辑器上下文仍保留 |
+| `default` | `{ viewMode: ViewMode }` | 完整替换默认标题与控件；保留 provide 的编辑器上下文 |
 | `review-actions` | 下表全部参数 | 替换默认审阅控件弹出菜单的内容；需要默认工具栏、config.reviewActions 为真，并打开审阅菜单 |
 
 自定义 default 后，原默认审阅控件不再创建，因此此处的 review-actions 不会自动转发给手动放入的 VmoMonacoDiffReview；应使用那个控件自己的 default 插槽。默认回退内容是各控件组成的工具栏和内置审阅按钮。review-actions 不替换审阅触发图标或弹出层容器。
@@ -678,7 +676,7 @@
 
 | 名称 | 参数 | 默认内容与渲染条件 |
 | --- | --- | --- |
-| `default` | `{ active: boolean }` | 替换按钮内的文字内容；仅在有可预览目标时渲染。缺省显示“预览”／“返回编辑器” |
+| `default` | `{ active: boolean }` | 定制按钮内的内容；仅在有可预览目标时渲染。缺省仅显示图标，通过提示与选中态表达状态 |
 
 active 表示当前内部预览状态，不是下一步操作。插槽保留外层 button、图标、点击行为、title、aria-label 和 aria-pressed；不替换整个按钮，不要在其中嵌套另一个按钮。
 

@@ -5,7 +5,7 @@
   -->
   <div :class="['vmo-monaco-ui', theme == 'vs-dark' ? 'dark' : 'light']">
     <div class="bar">
-      <slot>
+      <slot :view-mode="monacos[0]?.currentViewMode || 'edit'">
         <span class="title">{{ title }}</span>
         <span class="setting">
           <!-- 默认控件不再由 UI 容器承接事件；它们通过 inject 到的 monaco 自行调用 editor public API。 -->
@@ -16,6 +16,7 @@
               <slot name="review-actions" v-bind="slotProps"></slot>
             </template>
           </diff-review>
+          <preview-toggle v-if="config.preview !== false" />
           <theme-toggle v-if="!!config?.theme" :config="themeControlConfig" />
           <fullscreen-toggle v-if="!!config?.fullScreen" />
           <minimap-toggle v-if="!!config?.minimap" />
@@ -25,31 +26,7 @@
         </span>
       </slot>
     </div>
-    <div v-if="monacos.length" class="editor-state">
-      <div class="state-group">
-        <span class="state-label">内容</span>
-        <div v-if="diffMonacos.length" class="content-modes" role="group" aria-label="内容视图">
-          <button v-for="mode in contentModes" :key="mode.value" type="button"
-            :aria-pressed="currentContentMode === mode.value"
-            :title="mode.label"
-            @click="changeContentMode(mode.value)">{{ mode.label }}</button>
-        </div>
-        <span v-else>正文</span>
-        <span v-if="!isPreview && currentContentMode === 'diff'" class="state-detail">{{ diffViewLabel }}</span>
-      </div>
-      <div class="state-group">
-        <span class="state-label">模式</span>
-        <span class="state-value">{{ interactionLabel }}</span>
-        <preview-toggle v-if="config.preview !== false" />
-      </div>
-      <span v-if="isPreview && diffMonacos.length" class="state-detail">预览来源：{{ diffMonacos[0].currentPreviewSource === 'original' ? '正文' : '提案' }}</span>
-      <div class="state-group state-settings" role="status" aria-label="当前编辑器设置">
-        <span>语言 <strong>{{ editorOption.language || 'plaintext' }}</strong></span>
-        <span>字号 <strong>{{ editorOption.fontSize || 12 }} px</strong></span>
-        <span>主题 <strong>{{ theme === 'vs-dark' ? '深色' : '浅色' }}</strong></span>
-        <span v-if="monacoNeedConfirm" class="state-pending">待确认</span>
-      </div>
-    </div>
+
   </div>
 </template>
 
@@ -91,29 +68,12 @@
 .vmo-monaco-ui .languages select {
   @apply flex-grow w-0 outline-none bg-[#88888820] border-none ml-[5px] p-[4px] border border-[#88888833] rounded;
 }
-.vmo-monaco-ui .editor-state {
-  @apply flex flex-row flex-wrap items-center gap-x-[20px] gap-y-[8px] w-full py-[8px] border-t border-[#88888820] text-xs;
-}
-.vmo-monaco-ui .state-group {
-  @apply flex flex-row flex-wrap items-center gap-[8px];
-}
-.vmo-monaco-ui .state-label, .vmo-monaco-ui .state-detail {
-  @apply opacity-70;
-}
-.vmo-monaco-ui .state-value { @apply font-medium; }
-.vmo-monaco-ui .state-settings { @apply ml-auto gap-x-[16px]; }
-.vmo-monaco-ui .state-settings strong { @apply font-medium; }
-.vmo-monaco-ui .state-pending { @apply text-amber-600; }
-.vmo-monaco-ui .content-modes { @apply flex rounded border border-[#88888833] overflow-hidden; }
-.vmo-monaco-ui .content-modes button { @apply px-[10px] py-[3px] cursor-pointer; }
-.vmo-monaco-ui .content-modes button[aria-pressed='true'] { @apply text-[#00BB55] bg-[#00BB5514] font-bold; }
 .vmo-monaco-ui button:focus-visible { @apply outline outline-2 outline-offset-2 outline-[#00BB55]; }
 </style>
 
 <script lang="ts">
 import { computed, defineComponent, provide } from 'vue'
 import type { PropType } from 'vue'
-import type { VmoMonacoDiffEditorExpose } from '@type'
 import LanguageSelect from './controls/language-select.vue'
 import FontSizeInput from './controls/font-size-input.vue'
 import ThemeToggle from './controls/theme-toggle.vue'
@@ -200,22 +160,6 @@ export default defineComponent({
     })
     const editorOption = computed(() => monacos.value[0]?.computedMonacoEditorOption || {})
     const theme = computed(() => editorOption.value.theme || 'vs-light')
-    const diffMonacos = computed(() => monacos.value.filter((target): target is VmoMonacoDiffEditorExpose =>
-      typeof (target as Partial<VmoMonacoDiffEditorExpose>)?.changeEditMode === 'function'))
-    const primaryDiff = computed(() => diffMonacos.value[0])
-    const isPreview = computed(() => monacos.value[0]?.currentViewMode === 'preview')
-    const currentContentMode = computed(() => primaryDiff.value?.currentEditMode || 'original')
-    const diffViewLabel = computed(() => primaryDiff.value?.currentDiffViewMode === 'inline' ? '行内' : '并排')
-    const interactionLabel = computed(() => isPreview.value ? '预览'
-      : (monacos.value[0]?.currentReadOnly ?? editorOption.value.readOnly) ? '只读' : '编辑')
-    const contentModes = [
-      { value: 'original', label: '正文' },
-      { value: 'modified', label: '提案' },
-      { value: 'diff', label: '比对' }
-    ] as const
-    function changeContentMode(mode: 'original' | 'modified' | 'diff') {
-      diffMonacos.value.forEach(editor => editor.changeEditMode(mode))
-    }
     const monacoNeedConfirm = computed(() => monacos.value.some(monaco => monaco?.needConfirm))
 
     // UI config 的 true/false 主要表示是否显示控件。
@@ -245,8 +189,7 @@ export default defineComponent({
     })
 
     return {
-      monacos, editorOption, diffMonacos, contentModes, currentContentMode, isPreview,
-      diffViewLabel, interactionLabel, changeContentMode,
+      monacos, editorOption,
       theme,
       monacoNeedConfirm,
       languageVisible,

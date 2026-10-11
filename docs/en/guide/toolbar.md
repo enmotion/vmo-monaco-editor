@@ -63,7 +63,7 @@ If `monaco` is an array, option controls apply to all targets; fullscreen switch
 
 ## State bindings
 
-With an attached editor, the persistent second row separates content (original, proposal, diff) from interaction mode (edit, readonly, preview), and displays current language, font size, theme and pending confirmation. Diff shows side-by-side or inline layout, and preview highlights its actual source. Content switches only change editMode and preserve preview; previewSource selects the previewed draft separately. The preview toggle reads “返回编辑器” (return to editor) while active and restores the previous editor view. Current language, font size in px and theme remain visible even when their setting controls are hidden. A custom default slot replaces the upper controls while retaining this status row; `preview: false` hides the status-row preview toggle.
+Current values, active icons and hover hints indicate state. The default slot fully replaces the toolbar controls; editor props and events remain the state binding interface.
 
 ```vue
 <script setup lang="ts">
@@ -205,10 +205,10 @@ For multiple targets, displayed option values usually come from the first target
 
 | Component | Slot | Props and purpose |
 | --- | --- | --- |
-| VmoMonacoUi | default | No props; replaces upper controls, preserves status row and injected editor context |
+| VmoMonacoUi | default | `{ viewMode }`; replaces all default controls, preserving injected editor context |
 | VmoMonacoUi | review-actions | All props below; replaces built-in review menu; requires default toolbar and config.reviewActions |
 | VmoMonacoDiffReview | default | All props below; replaces this control's review menu |
-| VmoMonacoPreviewToggle | default | `{ active: boolean }`; replaces button text, not the outer button or click behavior |
+| VmoMonacoPreviewToggle | default | `{ active: boolean }`; customizes button content, not the outer button or click behavior |
 | Commit, font size, language, theme, fullscreen, line number, minimap controls | None | No slot outlets; supplied slot content is not rendered |
 
 Both review slots render only while the menu is open, retaining the trigger, popover and outside-click closing behavior. With a custom UI default slot, review-actions is not forwarded to manually inserted review controls; use VmoMonacoDiffReview's default slot instead.
@@ -247,4 +247,15 @@ Destructure camelCase names even though template bindings use kebab-case. The sl
     <span>{{ active ? 'Return to editor' : 'Preview' }}</span>
   </template>
 </VmoMonacoPreviewToggle>
+```
+
+The editors’ toolbar (`default`) slots and `VmoMonacoUi`’s default slot receive `{ viewMode }`, the effective internal edit/preview state. UI reads its first target, falling back to edit when no target is available. Parent writeback is not required.
+
+```vue
+<VmoMonacoUi :monaco="editorRef">
+  <template #default="{ viewMode }">
+    <VmoMonacoFontSizeInput v-show="viewMode === 'edit'" />
+    <VmoMonacoPreviewToggle />
+  </template>
+</VmoMonacoUi>
 ```

@@ -381,7 +381,7 @@ For a diff editor, enable the review popover:
   }" />
 ```
 
-The persistent status row separates content (original/proposal/diff) from interaction mode (edit/readonly/preview), highlights the actual preview source and shows side-by-side/inline layout for diff. Current language, font size in px, theme and pending confirmation stay visible even when the corresponding setting controls are hidden. A custom default slot replaces only the upper controls and preserves the status row. UI config is for control visibility; the editor's props are the state bindings.
+Current values, active icons and hover hints indicate state. The default slot fully replaces the toolbar controls; editor props and events remain the state binding interface.
 
 Standalone setting controls support `v-model:value`, with `v-model` aliases for font size and language. They retain internal actions without parent writeback and synchronize actual external changes to the target. Control interaction events are not forwarded by `VmoMonacoUi`; editor `update:*` events are emitted directly by the editor.
 
@@ -502,7 +502,7 @@ import type {
 Three standalone components are exported: `VmoTextPreview`, `VmoCodePreview`, and
 `VmoMarkdownPreview`. They can be placed inside a preview slot or used on their own.
 `VmoMonacoDiffEditor` provides a `#preview` slot and a `preview` display mode.
-When the slot is supplied, the status row includes a preview toggle. Click “返回编辑器” (return to editor) to restore the previous editor view. Without the slot, the toggle is hidden and preview is unavailable. UI `preview: false` hides the status-row toggle. A custom `VmoMonacoUi` default slot replaces only the upper controls, so the status row and its preview toggle remain. When building an entirely separate toolbar, use the exported `VmoMonacoPreviewToggle`, which supports a direct `monaco` prop and custom button content.
+The default toolbar includes an icon-only preview toggle when a preview slot exists; `config.preview: false` hides it. Its hover hint and pressed state indicate the current view. A custom toolbar slot replaces all default controls; include `VmoMonacoPreviewToggle` there when needed.
 
 ```vue
 <script setup lang="ts">
@@ -607,7 +607,7 @@ The slot receives `content` (the internal current draft, including uncommitted
 edits), `language`, `source` (`original` or `modified`), and `theme`. Use any of the
 three preview components or your own renderer inside it.
 
-Without an explicit `previewSource`, entering preview from Original selects the original draft; entering from Proposal or Diff selects the proposal. An explicit source prop initializes the source and synchronizes on actual external changes. Local source changes remain effective while that prop is unchanged, including on re-entry into preview. The status row changes editMode independently; the preview source buttons change previewSource without leaving preview. Preview does not commit text or replace the two models. Removing the slot returns to edit and preserves editMode.
+Without an explicit `previewSource`, entering preview from Original selects the original draft; entering from Proposal or Diff selects the proposal. An explicit source prop initializes the source and synchronizes on actual external changes. Local source changes remain effective while that prop is unchanged, including on re-entry into preview. Changing editMode preserves viewMode; the preview source buttons change previewSource without leaving preview. Preview does not commit text or replace the two models. Removing the slot returns to edit and preserves editMode.
 
 Use `v-model:view-mode` and `v-model:preview-source` to track view and source, or listen to `@update:view-mode="handleMode($event)"` and `@update:preview-source="handleSource($event)"` without writing back. The editor emits `view-mode-change` and `preview-source-change` notifications independently. Neither `needConfirm` nor `bidibind` delays these state updates. Preview itself has no editable input; `currentReadOnly` describes the editor view's editing permission.
 
@@ -648,13 +648,15 @@ Bilingual VitePress sources live in `docs/`. GitHub Pages deploys through `.gith
 
 ## Component slots
 
+The exported `VmoMonacoEditorSlots<Source>` type describes optional slot functions with defined props. Source defaults to `original | modified`; the ordinary editor uses `original`.
+
 | Component | Slots | Props and fallback |
 | --- | --- | --- |
-| VmoMonacoEditor | default; prefix; suffix; preview | default: no props, toolbar above editor. prefix/suffix: `{ option }`, current merged options; fallback renders the corresponding HTML prop outside the model. preview: `{ content, language, source, theme }`; source is original |
-| VmoMonacoDiffEditor | default; prefix; suffix; preview | Same editor slots; preview: `{ content, language, source, theme }`, internal draft including uncommitted edits; no built-in content renderer, only renders in preview mode |
-| VmoMonacoUi | default; review-actions | default: no props, replaces upper controls but preserves status row/injection. review-actions: review props below, replaces built-in popover content when config.reviewActions is enabled and the menu is open |
+| VmoMonacoEditor | default; prefix; suffix; preview | default: `{ viewMode: 'edit' \| 'preview' }`, toolbar above editor. prefix/suffix: `{ option }`, current merged options; fallback renders the corresponding HTML prop outside the model. preview: `{ content, language, source, theme }`; source is original |
+| VmoMonacoDiffEditor | default; prefix; suffix; preview | Same editor slots; preview: `{ content, language, source, theme }`, internal draft including uncommitted edits; no built-in content renderer, renders only in preview mode |
+| VmoMonacoUi | default; review-actions | default: `{ viewMode: 'edit' \| 'preview' }`, replaces all default controls while preserving editor injection. review-actions: review props below, replaces built-in popover content when config.reviewActions is enabled and the menu is open |
 | VmoMonacoDiffReview | default | Review props below; replaces an open popover's content while retaining trigger, container and outside-click closing |
-| VmoMonacoPreviewToggle | default | `{ active: boolean }`, current preview state; replaces button text only, retaining icon, click and accessibility behavior. Fallback: preview/return-to-editor text; hidden without a capable target |
+| VmoMonacoPreviewToggle | default | `{ active: boolean }`, current preview state; customizes button content only, retaining icon, click and accessibility behavior. Fallback: icon only with hover hints and pressed state; hidden without a capable target |
 | VmoMonacoCommitButton, VmoMonacoFontSizeInput, VmoMonacoLanguageSelect, VmoMonacoThemeToggle, VmoMonacoFullscreenToggle, VmoMonacoLineNumbersToggle, VmoMonacoMinimapToggle | None | Supplied slot content is not rendered |
 | VmoTextPreview, VmoCodePreview, VmoMarkdownPreview | None | Use content/render/monacoOptions props instead |
 

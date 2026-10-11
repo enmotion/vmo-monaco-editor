@@ -1,6 +1,6 @@
 <template>
   <div
-    class="vmo-preview vmo-markdown-preview"
+    class="vmo-preview-container vmo-markdown-preview"
     :class="{ 'is-styled': !unstyled }"
     :data-theme="theme"
     v-html="renderedContent"></div>

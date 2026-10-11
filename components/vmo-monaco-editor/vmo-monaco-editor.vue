@@ -13,7 +13,7 @@
       ]"
       :style="mergeDeepRight(context.attrs?.style || {}, isFullScreen ? { zIndex: zIndex } : {})">
       <!-- 默认插槽通常用于注入 vmo-monaco-ui 或用户自定义工具栏。 -->
-      <slot v-if="context.slots.default"></slot>
+      <slot v-if="context.slots.default" :view-mode="currentViewMode"></slot>
       <!-- prefix/suffix 是编辑器外部的附加展示内容，不进入 Monaco model。 -->
       <slot v-if="!!prefix || context.slots.prefix" name="prefix" :option="computedMonacoEditorOption">
         <div :class="['prefix']">
@@ -74,10 +74,10 @@ import { mergeDeepRight, isNil } from 'ramda'
 import 'monaco-editor/esm/vs/basic-languages/css/css.contribution'
 import 'monaco-editor/esm/vs/basic-languages/xml/xml.contribution'
 import 'monaco-editor/esm/vs/basic-languages/javascript/javascript.contribution'
-import type { PropType, StyleValue } from 'vue'
+import type { PropType, StyleValue, SlotsType } from 'vue'
 import { useReminderPlugin } from '../../index'
 import type { VmoMonacoViewMode } from '../vmo-monaco-diff-editor/types'
-import type { VmoMonacoContext } from '@type'
+import type { VmoMonacoContext, VmoMonacoEditorSlots } from '@type'
 import * as Monaco from 'monaco-editor'
 import { useEditorOptions, useEditorFullscreen } from '../../use.lib/use-editor-state'
 import { vmoMonacoEditorDefaultOption } from './config'
@@ -85,6 +85,7 @@ import { vmoMonacoEditorDefaultOption } from './config'
 export default defineComponent({
   name: 'vmo-monaco-editor',
   inheritAttrs: false,
+  slots: Object as SlotsType<VmoMonacoEditorSlots<'original'>>,
   props: {
     prefix: {
       // 前置内容

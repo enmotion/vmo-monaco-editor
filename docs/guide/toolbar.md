@@ -56,9 +56,7 @@ props、emit 与完整实例成员清单见[组件 API 完整参考](./api)。
 
 ## 当前状态与视图切换
 
-工具栏第二行持续展示两个维度：**内容**（正文／提案／比对）和**模式**（编辑／只读／预览）。比对会标明并排或行内；预览会高亮实际预览的正文或提案。预览中切换正文／提案／比对只改变 editMode，预览来源由 previewSource 独立控制。预览按钮显示“返回编辑器”时，点击会恢复进入预览前的编辑器视图。
-
-绑定编辑器后，当前语言、字号（px）、主题和待确认状态会跟随实例变化显示，即使对应设置控件隐藏也可以查看。传入实例数组时，当前视图及设置以首个对应实例为准，切换作用于所有对应实例。自定义默认插槽替换上方工具栏，状态行仍然保留。
+状态由现有控件的当前值、选中态和悬停提示表达，不追加状态文字行。自定义 default 插槽完整替换默认工具栏；需要预览时自行放入 VmoMonacoPreviewToggle。
 
 ## 状态双向绑定
 
@@ -144,7 +142,7 @@ import { VmoMonacoUi, VmoMonacoCommitButton, VmoMonacoDiffReview,
 </template>
 ```
 
-在工具栏外使用控件时，直接传 `:monaco="editorRef"`。自定义默认插槽替换上方控件，状态行仍保留，预览开关仍由 `config.preview` 控制；无需重复放入预览控件。完全自建工具栏、不使用 `VmoMonacoUi` 时，可以单独添加 `VmoMonacoPreviewToggle`。
+在工具栏外使用控件时，直接传 `:monaco="editorRef"`。自定义 default 插槽完整替换默认控件；需要预览时自行添加 `VmoMonacoPreviewToggle`。
 
 导出的独立控件：`VmoMonacoCommitButton`、`VmoMonacoFontSizeInput`、`VmoMonacoFullscreenToggle`、`VmoMonacoLanguageSelect`、`VmoMonacoLineNumbersToggle`、`VmoMonacoMinimapToggle`、`VmoMonacoDiffReview`、`VmoMonacoThemeToggle`、`VmoMonacoPreviewToggle`。控件接受 `monaco`、`config`；具体值类型由对应 `VmoMonaco*ControlValue` 导出类型定义。
 
@@ -194,10 +192,10 @@ import { VmoMonacoUi, VmoMonacoCommitButton, VmoMonacoDiffReview,
 
 | 组件 | 插槽 | 参数与用途 |
 | --- | --- | --- |
-| VmoMonacoUi | default | 无参数；替换上方默认控件，状态行保留；内部控件仍自动注入 editor |
+| VmoMonacoUi | default | `{ viewMode }`；完整替换默认控件；内部控件仍自动注入 editor |
 | VmoMonacoUi | review-actions | 下表全部参数；替换内置审阅弹出菜单；需要默认工具栏和 config.reviewActions |
 | VmoMonacoDiffReview | default | 下表全部参数；替换该控件弹出菜单 |
-| VmoMonacoPreviewToggle | default | `{ active: boolean }`；替换按钮文字，不替换外层按钮及点击行为 |
+| VmoMonacoPreviewToggle | default | `{ active: boolean }`；定制按钮内容，不替换外层按钮及点击行为 |
 | 提交、字号、语言、主题、全屏、行号、小地图控件 | 无 | 没有插槽出口；传入插槽内容不会渲染 |
 
 两个审阅插槽仅在菜单打开时渲染，保留触发图标、弹出层及外部点击关闭逻辑。自定义 UI default 后，review-actions 不会自动转发给手动放入的审阅控件，应在 VmoMonacoDiffReview 上使用 default。
@@ -236,4 +234,15 @@ import { VmoMonacoUi, VmoMonacoCommitButton, VmoMonacoDiffReview,
     <span>{{ active ? 'Return to editor' : 'Preview' }}</span>
   </template>
 </VmoMonacoPreviewToggle>
+```
+
+编辑器承载工具栏的 default 插槽与 `VmoMonacoUi` 的 default 插槽都接收 `{ viewMode }`，值为内部实际生效的 edit／preview 状态，不依赖父组件回写。UI 使用首个目标；没有目标时回退 edit。
+
+```vue
+<VmoMonacoUi :monaco="editorRef">
+  <template #default="{ viewMode }">
+    <VmoMonacoFontSizeInput v-show="viewMode === 'edit'" />
+    <VmoMonacoPreviewToggle />
+  </template>
+</VmoMonacoUi>
 ```

@@ -36,7 +36,7 @@ const disabled = ref(true)
 function toggleAppTheme() {
   appTheme.value = appTheme.value == 'vs-light' ? 'vs-dark' : 'vs-light'
 }
-const viewMode = ref<'edit' | 'preview'>('edit')
+const viewMode = ref<'edit' | 'preview'>('preview')
 const isPreview = computed(() => viewMode.value === 'preview')
 const remindConfig = ref([
   {
@@ -189,16 +189,18 @@ const remindConfig = ref([
             fullScreen: true,
             reviewActions: true
           }">
-          <div class="flex-row flex grow justify-between items-center">
-            <span>aaa</span>
-            <span class="flex-row flex">
-              <previewToggle></previewToggle>
-              <commitButton v-if="!isPreview"></commitButton>
-              <fontSizeInput v-if="!isPreview"></fontSizeInput>
-              <themeToggle v-if="!isPreview"></themeToggle>
-              <diffReview v-if="!isPreview"></diffReview>
-            </span>
-          </div>
+          <template #default="{ viewMode }">
+            <div class="flex-row flex grow justify-between items-center">
+              <span>aaa{{ viewMode }}</span>
+              <span class="flex-row flex">
+                <previewToggle></previewToggle>
+                <commitButton v-if="viewMode=='edit'"></commitButton>
+                <fontSizeInput v-if="viewMode=='edit'"></fontSizeInput>
+                <themeToggle v-if="viewMode=='edit'"></themeToggle>
+                <diffReview v-if="viewMode=='edit'"></diffReview>
+              </span>
+            </div>
+          </template>
         </vmo-monaco-ui>
         <template #preview="{ content, theme }">
           <vmo-text-preview :content="content" :theme="theme" />

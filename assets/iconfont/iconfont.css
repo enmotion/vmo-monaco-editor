@@ -13,7 +13,7 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
-.vmo-preview:before {
+.iconfont.vmo-preview:before {
   content: "\e737";
 }
 

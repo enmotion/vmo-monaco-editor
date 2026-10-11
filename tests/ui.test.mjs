@@ -1,6 +1,9 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import * as Vue from 'vue'
+import fs from 'node:fs'
+import { compile } from '@vue/compiler-dom'
+import { renderToString } from '@vue/server-renderer'
 import { createLibraryLoader } from './helpers/load-library.mjs'
 
 test('toolbar provides its target reactively and normalizes flags, enums and per-control configuration', () => {
@@ -34,54 +37,52 @@ test('toolbar provides its target reactively and normalizes flags, enums and per
   assert.equal(ui.languageVisible.value, false)
 })
 
-test('toolbar separates preview source from editor view and reflects current settings', () => {
-  const component = createLibraryLoader({ vue: { ...Vue, provide() {} } })('components/vmo-monaco-ui/vmo-monaco-ui.vue').default
-  const calls = []
-  const editor = Vue.reactive({
-    computedMonacoEditorOption: { language: 'markdown', fontSize: 16, theme: 'vs-dark' },
-    currentViewMode: 'edit', currentEditMode: 'original', currentPreviewSource: 'original', currentReadOnly: true,
-    currentDiffViewMode: 'side-by-side',
-    changeEditMode(mode) { calls.push(['view', mode]); this.currentEditMode = mode },
-    changePreviewSource(source) { calls.push(['source', source]); this.currentPreviewSource = source }
-  })
-  const props = Vue.reactive({ monaco: editor, config: {} })
-  const ui = component.setup(props, {})
-  assert.equal(ui.currentContentMode.value, 'original')
-  assert.equal(ui.interactionLabel.value, '只读')
-  editor.currentViewMode = 'preview'
-  ui.changeContentMode('modified')
-  assert.deepEqual(calls.pop(), ['view', 'modified'])
-  assert.equal(ui.currentContentMode.value, 'modified')
-  assert.equal(ui.interactionLabel.value, '预览')
-  assert.equal(editor.currentViewMode, 'preview')
-  ui.changeContentMode('diff')
-  assert.deepEqual(calls.pop(), ['view', 'diff'])
-  assert.equal(ui.currentContentMode.value, 'diff')
-  assert.equal(ui.diffViewLabel.value, '并排')
-  editor.currentDiffViewMode = 'inline'
-  editor.currentReadOnly = false
-  assert.equal(ui.diffViewLabel.value, '行内')
-  editor.currentViewMode = 'edit'
-  assert.equal(ui.interactionLabel.value, '编辑')
-  editor.computedMonacoEditorOption.fontSize = 20
-  assert.equal(ui.editorOption.value.fontSize, 20)
-  props.monaco = { computedMonacoEditorOption: { readOnly: true, language: 'sql' } }
-  assert.equal(ui.diffMonacos.value.length, 0)
-  assert.equal(ui.currentContentMode.value, 'original')
-  assert.equal(ui.interactionLabel.value, '只读')
-  assert.equal(ui.editorOption.value.language, 'sql')
+function renderableToolbar() {
+  const component = createLibraryLoader()('components/vmo-monaco-ui/vmo-monaco-ui.vue').default
+  function render(file) {
+    const template = fs.readFileSync(new URL(file, import.meta.url), 'utf8').match(/<template>([\s\S]*)<\/template>/)[1]
+    return new Function('Vue', compile(template, { mode: 'function', prefixIdentifiers: true }).code)(Vue)
+  }
+  component.render = render('../components/vmo-monaco-ui/vmo-monaco-ui.vue')
+  component.components.PreviewToggle.render = render('../components/vmo-monaco-ui/controls/preview-toggle.vue')
+  return component
+}
+
+test('default toolbar has one row, an icon preview control and no duplicate state text', async () => {
+  const target = { hasPreview: true, currentViewMode: 'preview', needConfirm: false,
+    computedMonacoEditorOption: { language: 'sql', fontSize: 16, theme: 'vs-dark' }, changeViewMode() {} }
+  const html = await renderToString(Vue.h(renderableToolbar(), { title: 'Editor', monaco: target, config: {} }))
+  assert.match(html, /class="bar"/)
+  assert.match(html, /vmo-preview-toggle/)
+  assert.match(html, /aria-pressed="true"/)
+  assert.match(html, /aria-label="返回编辑器"/)
+  assert.doesNotMatch(html, /editor-state|state-settings|content-modes|预览来源：|待确认/)
+  assert.doesNotMatch(html, />(?:语言|字号|主题|模式|正文|预览|返回编辑器)</)
+  const hidden = await renderToString(Vue.h(renderableToolbar(), { monaco: target, config: { preview: false } }))
+  assert.doesNotMatch(hidden, /vmo-preview-toggle/)
 })
 
-test('toolbar changes editMode independently while both editor kinds display preview status', () => {
-  const component = createLibraryLoader({ vue: { ...Vue, provide() {} } })('components/vmo-monaco-ui/vmo-monaco-ui.vue').default
-  const target = Vue.reactive({ currentViewMode: 'preview', currentEditMode: 'diff',
-    changeEditMode(mode) { this.currentEditMode = mode } })
-  const ui = component.setup(Vue.reactive({ monaco: target, config: {} }), {})
-  ui.changeContentMode('original')
-  assert.equal(ui.currentContentMode.value, 'original')
-  assert.equal(ui.interactionLabel.value, '预览')
-  target.currentViewMode = 'edit'; target.currentEditMode = 'original'
-  assert.equal(ui.isPreview.value, false)
-  const ordinary = component.setup({ monaco: { currentViewMode: 'preview' }, config: {} }, {})
-  assert.equal(ordinary.interactionLabel.value, '预览')
+test('custom toolbar slot fully replaces default controls without appending UI', async () => {
+  const html = await renderToString(Vue.h(renderableToolbar(), {
+    monaco: { hasPreview: true, currentViewMode: 'preview', changeViewMode() {} }, config: {}
+  }, { default: () => Vue.h('button', { class: 'custom-toolbar' }, 'Custom') }))
+  assert.match(html, /custom-toolbar/)
+  assert.doesNotMatch(html, /editor-state|vmo-preview-toggle|state-settings|content-modes/)
+})
+
+test('UI default slot receives the effective first target viewMode with an edit fallback', async () => {
+  const target = Vue.reactive({ currentViewMode: 'edit', computedMonacoEditorOption: {} })
+  const component = renderableToolbar()
+  const seen = []
+  async function render(monaco) {
+    return renderToString(Vue.h(component, { monaco, config: {} }, {
+      default: ({ viewMode }) => { seen.push(viewMode); return Vue.h('span', { 'data-view-mode': viewMode }, 'Custom') }
+    }))
+  }
+  assert.match(await render(null), /data-view-mode="edit"/)
+  assert.match(await render(target), /data-view-mode="edit"/)
+  target.currentViewMode = 'preview'
+  assert.match(await render(target), /data-view-mode="preview"/)
+  assert.match(await render([target, { currentViewMode: 'edit' }]), /data-view-mode="preview"/)
+  assert.deepEqual(seen, ['edit', 'edit', 'preview', 'preview'])
 })

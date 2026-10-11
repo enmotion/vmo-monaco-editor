@@ -1,5 +1,5 @@
 <template>
-  <div ref="container" class="vmo-preview vmo-code-preview" :data-theme="theme"></div>
+  <div ref="container" class="vmo-preview-container vmo-code-preview" :data-theme="theme"></div>
 </template>
 
 <script lang="ts">

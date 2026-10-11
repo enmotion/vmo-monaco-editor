@@ -9,6 +9,8 @@ Both editors expose `viewMode: 'edit' | 'preview'` through `v-model:view-mode`, 
 
 Both editors provide the same `default`, `prefix`, `preview`, and `suffix` slots. The preview payload is `{ content, language, source, theme }`; the ordinary editor's source is always `original`. Preview requires a preview slot. Removing it returns to `edit` while retaining the diff editor's `editMode`. The ordinary editor preserves its Monaco instance and draft across view changes.
 
+The library exports `VmoMonacoEditorSlots<Source>`, with Source defaulting to `original | modified`; the ordinary editor uses `VmoMonacoEditorSlots<'original'>`. Slots are optional functions whose props object excludes undefined, so templates can directly destructure `{ content, theme }`.
+
 ```vue
 <VmoMonacoEditor v-model="body" v-model:view-mode="viewMode">
   <template #preview="{ content, language, source, theme }">
@@ -114,10 +116,10 @@ See [Normal editor](./editor).
 
 | Name | Props | Fallback and rendering condition |
 | --- | --- | --- |
-| `default` | None | Above the editor, typically a toolbar; no content when omitted |
+| `default` | `{ viewMode: ViewMode }` | Above the editor, typically a toolbar; no content when omitted |
 | `prefix` | `{ option: VmoMonacoEditorOption }` | Replaces extra content above the editor; otherwise renders the prefix prop through v-html. Present when the slot exists or prefix is nonempty |
 | `suffix` | `{ option: VmoMonacoEditorOption }` | Replaces extra content below the editor; otherwise renders the suffix prop through v-html. Present when the slot exists or suffix is nonempty |
-| `preview` | `{ content: string; language: string; source: 'original'; theme: Theme }` | Current draft; only renders in preview mode; no built-in renderer. |
+| `preview` | `{ content: string; language: string; source: 'original'; theme: Theme }` | Current draft; renders only in preview mode; no built-in renderer. |
 
 `option` contains current options merged with defaults and follows state changes. Prefix/suffix content is outside the Monaco model. These slots do not receive a draft or submission methods. Use Vue interpolation for plain text and trusted content for HTML props.
 
@@ -245,7 +247,7 @@ See [Diff editor and review](./diff-editor).
 
 | Name | Props | Fallback and rendering condition |
 | --- | --- | --- |
-| `default` | None | Above the editor, typically a toolbar; no content when omitted |
+| `default` | `{ viewMode: ViewMode }` | Above the editor, typically a toolbar; no content when omitted |
 | `prefix` | `{ option: VmoMonacoEditorOption }` | Replaces extra content above the editor; otherwise renders the prefix prop through v-html. Present when the slot exists or prefix is nonempty |
 | `suffix` | `{ option: VmoMonacoEditorOption }` | Replaces extra content below the editor; otherwise renders the suffix prop through v-html. Present when the slot exists or suffix is nonempty |
 | `preview` | `{ content: string; language: string; source: Source; theme: Theme }` | Rendered only in preview display mode; supplying this slot enables preview, with no built-in content renderer |
@@ -299,11 +301,11 @@ Default config:
 
 The toolbar shows the language selector only when more than one language is configured. `language: false` explicitly hides it. A current language outside the list appears as a disabled option. Equivalent inline option rerenders preserve toolbar selections; actual external language changes still synchronize.
 
-The persistent status row shows content, interaction mode, current language, font size in px, theme and pending confirmation. Hidden setting controls do not hide current settings; a custom default slot preserves this row. UI `config.fullScreen` controls button visibility; the editor `fullScreen` prop is the bindable state.
+Current values, active icons and hover hints indicate state. The default slot fully replaces the toolbar controls; editor props and events remain the state binding interface.
 
 ### Emits and instance methods
 
-No custom emits. The UI does not forward child control interaction events; listen on controls in a custom default slot. Editor state updates are emitted by the editor itself. `changeContentMode(mode)` accepts original, modified or diff and applies to all diff targets: content actions only change editMode, preserving viewMode and previewSource.
+No custom emits. The UI does not forward child control interaction events; listen on controls in a custom default slot. Editor state updates are emitted by the editor itself.
 
 ### Instance properties
 
@@ -311,12 +313,6 @@ No custom emits. The UI does not forward child control interaction events; liste
 | --- | --- | --- |
 | `monacos` | Target[] | Current editor target array |
 | `editorOption` | Option | Current first-target options |
-| `diffMonacos` | VmoMonacoDiffEditorExpose[] | Diff targets supporting display mode changes |
-| `contentModes` | EditMode descriptor array | Values and labels for original/proposal/diff |
-| `currentContentMode` | original / modified / diff | Current editMode, independent of previewSource |
-| `isPreview` | boolean | Whether currently previewing |
-| `diffViewLabel` | string | Side-by-side/inline label |
-| `interactionLabel` | string | Edit/readonly/preview label |
 | `theme` | Theme | First target theme, falling back to vs-light |
 | `monacoNeedConfirm` | boolean | Whether any target requires confirmation |
 | `languageVisible` | boolean | More than one language and not explicitly hidden |
@@ -330,9 +326,11 @@ No custom emits. The UI does not forward child control interaction events; liste
 
 ### Slots
 
+The editors’ toolbar (`default`) slots and `VmoMonacoUi`’s default slot receive `{ viewMode }`, the effective internal edit/preview state. UI reads its first target, falling back to edit when no target is available. Parent writeback is not required.
+
 | Name | Props | Fallback and rendering condition |
 | --- | --- | --- |
-| `default` | None | Replaces upper title/default controls; the lower status row and provided editor context remain |
+| `default` | `{ viewMode: ViewMode }` | Replaces all default title/controls; provided editor context remains |
 | `review-actions` | All props listed below | Replaces the default review control's popover content; requires the default toolbar, truthy config.reviewActions and an open review menu |
 
 With a custom default slot the built-in review control is not created, so review-actions is not automatically forwarded to a manually inserted VmoMonacoDiffReview. Use that control's own default slot. Fallback content is the default toolbar and built-in review buttons. review-actions replaces neither the trigger icon nor the popover container.
@@ -678,7 +676,7 @@ No slots. Supplied default or named slot content is not rendered; customize thro
 
 | Name | Props | Fallback and rendering condition |
 | --- | --- | --- |
-| `default` | `{ active: boolean }` | Replaces text inside the button, rendered only with a preview-capable target. Fallback is “预览” (preview) or “返回编辑器” (return to editor) |
+| `default` | `{ active: boolean }` | Customizes content inside the button, rendered only with a preview-capable target. Fallback is an icon with hover hints and pressed state |
 
 active is the current local preview state, not the next action. The outer button, icon, click handling, title, aria-label and aria-pressed remain. This does not replace the whole button; do not nest another button inside it.
 

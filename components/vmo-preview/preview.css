@@ -1,5 +1,5 @@
 /* Low specificity allows ordinary application classes to override these defaults. */
-.vmo-preview:where(.is-styled) {
+.vmo-preview-container:where(.is-styled) {
   --_vmo-preview-color: #24292f;
   --_vmo-preview-background: #ffffff;
   --_vmo-preview-muted: #57606a;
@@ -16,7 +16,7 @@
   line-height: var(--vmo-preview-line-height, 1.7);
   overflow-wrap: anywhere;
 }
-.vmo-preview:where(.is-styled[data-theme='vs-dark']) {
+.vmo-preview-container:where(.is-styled[data-theme='vs-dark']) {
   --_vmo-preview-color: #d4d4d4;
   --_vmo-preview-background: #1e1e1e;
   --_vmo-preview-muted: #a0a0a0;

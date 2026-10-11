@@ -7,7 +7,7 @@
     :aria-label="currentValue ? '返回编辑器' : '预览当前内容'"
     :aria-pressed="currentValue"
     @click="togglePreview">
-    <slot :active="currentValue"><span class="preview-toggle-label">{{ currentValue ? '返回编辑器' : '预览' }}</span></slot>
+    <slot :active="currentValue"></slot>
   </button>
 </template>
 
@@ -18,7 +18,6 @@
 .vmo-preview-toggle.is-active {
   @apply text-[#00BB55] bg-[#00BB5514];
 }
-.preview-toggle-label { margin-left: 5px; font-family: sans-serif; }
 </style>
 
 <script lang="ts">

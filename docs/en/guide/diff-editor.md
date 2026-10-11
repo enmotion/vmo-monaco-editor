@@ -220,7 +220,7 @@ View changes and refresh reuse both models, retaining text and model undo histor
 
 | Name | Props | Fallback and rendering condition |
 | --- | --- | --- |
-| `default` | None | Above the editor, typically a toolbar; no content when omitted |
+| `default` | `{ viewMode: ViewMode }` | Above the editor, typically a toolbar; no content when omitted |
 | `prefix` | `{ option: VmoMonacoEditorOption }` | Replaces extra content above the editor; otherwise renders the prefix prop through v-html. Present when the slot exists or prefix is nonempty |
 | `suffix` | `{ option: VmoMonacoEditorOption }` | Replaces extra content below the editor; otherwise renders the suffix prop through v-html. Present when the slot exists or suffix is nonempty |
 | `preview` | `{ content: string; language: string; source: Source; theme: Theme }` | Rendered only in preview display mode; supplying this slot enables preview, with no built-in content renderer |

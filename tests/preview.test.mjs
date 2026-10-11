@@ -7,6 +7,17 @@ import * as Vue from 'vue'
 import { compile } from '@vue/compiler-dom'
 import { renderToString } from '@vue/server-renderer'
 import MarkdownIt from 'markdown-it'
+import postcss from 'postcss'
+
+test('preview icon CSS requires iconfont and cannot inject a glyph into preview containers', () => {
+  const css = fs.readFileSync(new URL('../assets/iconfont/iconfont.css', import.meta.url), 'utf8')
+  const selectors = []
+  postcss.parse(css).walkRules(rule => {
+    if (rule.selector.includes('.vmo-preview')) selectors.push(...rule.selectors)
+  })
+  assert.ok(selectors.length > 0)
+  for (const selector of selectors) assert.match(selector, /^\.iconfont\.vmo-preview::?before$/)
+})
 
 function component(name, Monaco = {}) {
   const source = fs.readFileSync(new URL(`../components/vmo-preview/vmo-${name}-preview.vue`, import.meta.url), 'utf8')

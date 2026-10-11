@@ -202,7 +202,7 @@ URI 属性是供组件构造 `inmemory://` URI 的标识，不是文件加载地
 
 | 名称 | 参数 | 默认内容与渲染条件 |
 | --- | --- | --- |
-| `default` | 无 | 位于编辑器上方，可放工具栏；未提供时不渲染此区域 |
+| `default` | `{ viewMode: ViewMode }` | 位于编辑器上方，可放工具栏；未提供时不渲染此区域 |
 | `prefix` | `{ option: VmoMonacoEditorOption }` | 替换上方附加内容；未提供插槽时用 `v-html` 渲染 prefix prop。插槽存在或 prefix 非空时渲染 |
 | `suffix` | `{ option: VmoMonacoEditorOption }` | 替换下方附加内容；未提供插槽时用 `v-html` 渲染 suffix prop。插槽存在或 suffix 非空时渲染 |
 | `preview` | `{ content: string; language: string; source: Source; theme: Theme }` | 仅在 currentViewMode 为 preview 时渲染；提供此插槽才有预览能力，无内置正文渲染器 |
