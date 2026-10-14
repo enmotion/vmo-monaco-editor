@@ -58,7 +58,7 @@ export default defineComponent({
     ))
     const sourceEditor = computed(() => {
       const editor = diffMonacos.value[0]
-      return editor?.currentViewMode === 'preview' && editor.hasContentChanges ? editor : undefined
+      return editor?.currentViewMode === 'preview' && editor.hasContentChanges && editor.hasModifiedContent ? editor : undefined
     })
     function changePreviewSource(source: 'original' | 'modified') {
       diffMonacos.value.forEach(editor => {

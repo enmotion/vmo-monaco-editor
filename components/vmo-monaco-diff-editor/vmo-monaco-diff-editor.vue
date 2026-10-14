@@ -266,6 +266,7 @@ export default defineComponent({
     // needConfirm=false 时 model 变化会立刻同步；needConfirm=true 时由 confirm/commit 输出。
     const originalInnerValue = ref('')
     const modifiedInnerValue = ref('')
+    const hasModifiedContent = computed(() => modifiedInnerValue.value.length > 0)
     const hasContentChanges = computed(() => modifiedInnerValue.value !== originalInnerValue.value)
     const previewContent = computed(() => currentPreviewSource.value == 'original' ? originalInnerValue.value : modifiedInnerValue.value)
     const previewLanguage = computed(() => computedMonacoEditorOption.value.language || 'plaintext')
@@ -812,6 +813,7 @@ export default defineComponent({
       hasPreview,
       currentPreviewSource,
       hasContentChanges,
+      hasModifiedContent,
       originalInnerValue,
       modifiedInnerValue,
       previewContent,

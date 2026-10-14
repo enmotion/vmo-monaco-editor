@@ -23,7 +23,7 @@ const originalContent = ref(`项目上线前，产品团队需要完成一次完
 另外，帮助说明中对异常场景的描述较少。当网络失败、权限不足、或数据为空时，页面只给出简短提示，无法帮助用户判断下一步应该怎么处理。
 
 因此，我们需要在保留原有语义的基础上，对段落结构、表达顺序、以及关键提示进行调整。`)
-const modifiedContent = ref(`2`)
+const modifiedContent = ref(``)
 const sqlReminderGenerator = useReminderPlugin('sql')
 const pythonReminderGenerator = useReminderPlugin('python')
 const typescriptReminderGenerator = useReminderPlugin()

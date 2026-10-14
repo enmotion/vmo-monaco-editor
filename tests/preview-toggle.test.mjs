@@ -102,10 +102,11 @@ test('preview control supports ordinary and diff editors through independent vie
   assert.equal(targets[1].currentViewMode, 'edit')
 })
 
-test('source controls appear only for changed diff previews and switch through the editor API', async () => {
+test('source controls appear only for different nonempty diff previews and switch through the editor API', async () => {
   const target = editor('diff')
   Object.assign(target, {
     hasContentChanges: true,
+    hasModifiedContent: true,
     currentPreviewSource: 'modified',
     changePreviewSource(source) { this.currentPreviewSource = source }
   })
@@ -116,6 +117,9 @@ test('source controls appear only for changed diff previews and switch through t
   component.setup({}, { emit() {} }).changePreviewSource('original')
   assert.equal(target.currentPreviewSource, 'original')
   target.hasContentChanges = false
+  assert.doesNotMatch(await renderToString(Vue.h(component)), /aria-label="Preview source"/)
+  target.hasContentChanges = true
+  target.hasModifiedContent = false
   assert.doesNotMatch(await renderToString(Vue.h(component)), /aria-label="Preview source"/)
 })
 

@@ -583,7 +583,9 @@ test('content-change state follows drafts including an empty modified deletion a
   const { exposed, models, cleanup } = harness({ originalValue: 'original', modifiedValue: '' })
   try {
     assert.equal(exposed.hasContentChanges.value, true)
+    assert.equal(exposed.hasModifiedContent.value, false)
     models[1].setValue('original')
+    assert.equal(exposed.hasModifiedContent.value, true)
     assert.equal(exposed.hasContentChanges.value, false)
     models[0].setValue('changed original')
     assert.equal(exposed.hasContentChanges.value, true)
