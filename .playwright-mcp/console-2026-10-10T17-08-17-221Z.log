@@ -1,0 +1,10 @@
+[29465949ms] [INFO] Slow network is detected. See https://www.chromestatus.com/feature/5636954674692096 for more details. Fallback font will be used while loading: http://127.0.0.1:1980/assets/iconfont/iconfont.woff2?t=1791605694641 @ http://127.0.0.1:1980/:0
+[29483856ms] [INFO] Slow network is detected. See https://www.chromestatus.com/feature/5636954674692096 for more details. Fallback font will be used while loading: http://127.0.0.1:1980/iconfont.woff2?t=1791605694641 @ :0
+[29483863ms] [WARNING] Failed to decode downloaded font: http://127.0.0.1:1980/iconfont.woff2?t=1791605694641 @ http://127.0.0.1:1980/:0
+[29483863ms] [WARNING] OTS parsing error: invalid sfntVersion: 1008821359 @ http://127.0.0.1:1980/:0
+[29483863ms] [INFO] Slow network is detected. See https://www.chromestatus.com/feature/5636954674692096 for more details. Fallback font will be used while loading: http://127.0.0.1:1980/iconfont.woff?t=1791605694641 @ http://127.0.0.1:1980/:0
+[29483867ms] [WARNING] Failed to decode downloaded font: http://127.0.0.1:1980/iconfont.woff?t=1791605694641 @ http://127.0.0.1:1980/:0
+[29483867ms] [WARNING] OTS parsing error: invalid sfntVersion: 1008821359 @ http://127.0.0.1:1980/:0
+[29483867ms] [INFO] Slow network is detected. See https://www.chromestatus.com/feature/5636954674692096 for more details. Fallback font will be used while loading: http://127.0.0.1:1980/iconfont.ttf?t=1791605694641 @ http://127.0.0.1:1980/:0
+[29483869ms] [WARNING] Failed to decode downloaded font: http://127.0.0.1:1980/iconfont.ttf?t=1791605694641 @ http://127.0.0.1:1980/:0
+[29483869ms] [WARNING] OTS parsing error: invalid sfntVersion: 1008821359 @ http://127.0.0.1:1980/:0

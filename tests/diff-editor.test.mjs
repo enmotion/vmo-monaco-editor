@@ -578,3 +578,20 @@ test('preview, content selection and comparison layout retain independent state'
   assert.equal(h.exposed.getModifiedEditor(), null)
   h.cleanup()
 })
+
+test('content-change state follows drafts including an empty modified deletion and equal content', async () => {
+  const { exposed, models, cleanup } = harness({ originalValue: 'original', modifiedValue: '' })
+  try {
+    assert.equal(exposed.hasContentChanges.value, true)
+    models[1].setValue('original')
+    assert.equal(exposed.hasContentChanges.value, false)
+    models[0].setValue('changed original')
+    assert.equal(exposed.hasContentChanges.value, true)
+    models[0].setValue('')
+    models[1].setValue('')
+    assert.equal(exposed.hasContentChanges.value, false)
+    await Vue.nextTick()
+  } finally {
+    cleanup()
+  }
+})

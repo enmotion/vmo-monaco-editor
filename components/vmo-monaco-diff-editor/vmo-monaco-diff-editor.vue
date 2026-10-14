@@ -18,10 +18,6 @@
       </slot>
       <div v-show="currentViewMode == 'edit'" ref="MonacoEditorRef" class="ide-container"></div>
       <div v-if="currentViewMode == 'preview'" class="vmo-preview-container">
-        <div v-if="!!modifiedInnerValue" class="vmo-preview-source" role="group" aria-label="Preview source">
-          <button type="button" :aria-pressed="currentPreviewSource == 'original'" @click="changePreviewSource('original')">正文</button>
-          <button type="button" :aria-pressed="currentPreviewSource == 'modified'" @click="changePreviewSource('modified')">提案</button>
-        </div>
         <div class="vmo-preview-content">
           <slot name="preview" :content="previewContent" :language="previewLanguage" :source="currentPreviewSource" :theme="computedMonacoEditorOption.theme"></slot>
         </div>
@@ -62,15 +58,6 @@
 }
 .vmo-monaco-editor-container .vmo-preview-container {
   @apply flex flex-col flex-grow h-0 min-h-0;
-}
-.vmo-monaco-editor-container .vmo-preview-source {
-  @apply flex flex-row gap-[6px] p-[8px] border-b border-[#88888833];
-}
-.vmo-monaco-editor-container .vmo-preview-source button {
-  @apply px-[8px] py-[4px] rounded border border-[#88888844];
-}
-.vmo-monaco-editor-container .vmo-preview-source button[aria-pressed='true'] {
-  @apply text-[#00BB55] border-[#00BB5588];
 }
 .vmo-monaco-editor-container .vmo-preview-content {
   @apply flex-grow min-h-0 overflow-auto;
@@ -279,6 +266,7 @@ export default defineComponent({
     // needConfirm=false 时 model 变化会立刻同步；needConfirm=true 时由 confirm/commit 输出。
     const originalInnerValue = ref('')
     const modifiedInnerValue = ref('')
+    const hasContentChanges = computed(() => modifiedInnerValue.value !== originalInnerValue.value)
     const previewContent = computed(() => currentPreviewSource.value == 'original' ? originalInnerValue.value : modifiedInnerValue.value)
     const previewLanguage = computed(() => computedMonacoEditorOption.value.language || 'plaintext')
 
@@ -823,6 +811,8 @@ export default defineComponent({
       currentReadOnly,
       hasPreview,
       currentPreviewSource,
+      hasContentChanges,
+      originalInnerValue,
       modifiedInnerValue,
       previewContent,
       previewLanguage,

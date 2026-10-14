@@ -23,7 +23,7 @@ const originalContent = ref(`项目上线前，产品团队需要完成一次完
 另外，帮助说明中对异常场景的描述较少。当网络失败、权限不足、或数据为空时，页面只给出简短提示，无法帮助用户判断下一步应该怎么处理。
 
 因此，我们需要在保留原有语义的基础上，对段落结构、表达顺序、以及关键提示进行调整。`)
-const modifiedContent = ref(``)
+const modifiedContent = ref(`2`)
 const sqlReminderGenerator = useReminderPlugin('sql')
 const pythonReminderGenerator = useReminderPlugin('python')
 const typescriptReminderGenerator = useReminderPlugin()
@@ -163,7 +163,7 @@ const remindConfig = ref([
           theme: appTheme,
           language: 'plaintext',
           wordWrap: 'on',
-          fontSize: 14,
+          fontSize: 50,
           showUnused: false,
           minimap: {
             enabled: false
@@ -175,6 +175,7 @@ const remindConfig = ref([
         :diff-view-mode="diffViewMode"
         :editable-original="true"
         :editable-modified="true"
+        @update:monacoOptions="console.log($event)"
         class="flex-grow border-t border-t-[#88888844]">
         <vmo-monaco-ui
           title="Text-Diff"
@@ -188,7 +189,8 @@ const remindConfig = ref([
             fontSize: true,
             fullScreen: true,
             reviewActions: true
-          }">
+          }"
+          >
           <template #default="{ viewMode }">
             <div class="flex-row flex grow justify-between items-center">
               <span>aaa{{ viewMode }}</span>
@@ -214,7 +216,7 @@ const remindConfig = ref([
         :z-index="5000"
         :monaco-options="{
           theme: appTheme,
-          fontSize: 14,
+          fontSize: 50,
           language: 'sql'
         }"
         :need-confirm="false"

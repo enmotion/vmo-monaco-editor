@@ -101,3 +101,40 @@ test('preview control supports ordinary and diff editors through independent vie
   control.togglePreview()
   assert.equal(targets[1].currentViewMode, 'edit')
 })
+
+test('source controls appear only for changed diff previews and switch through the editor API', async () => {
+  const target = editor('diff')
+  Object.assign(target, {
+    hasContentChanges: true,
+    currentPreviewSource: 'modified',
+    changePreviewSource(source) { this.currentPreviewSource = source }
+  })
+  const component = load([target])
+  assert.doesNotMatch(await renderToString(Vue.h(component)), /aria-label="Preview source"/)
+  target.currentViewMode = 'preview'
+  assert.match(await renderToString(Vue.h(component)), /aria-label="Preview source"/)
+  component.setup({}, { emit() {} }).changePreviewSource('original')
+  assert.equal(target.currentPreviewSource, 'original')
+  target.hasContentChanges = false
+  assert.doesNotMatch(await renderToString(Vue.h(component)), /aria-label="Preview source"/)
+})
+
+test('source switching affects previewing diff targets and preserves editing targets', () => {
+  function target(viewMode, source) {
+    return Vue.reactive({
+      ...editor('diff'), currentViewMode: viewMode, currentPreviewSource: source,
+      hasContentChanges: true,
+      changePreviewSource(next) { this.currentPreviewSource = next }
+    })
+  }
+  const first = target('preview', 'modified')
+  const editing = target('edit', 'modified')
+  const second = target('preview', 'modified')
+  const control = load([first, editing, second, editor('original')]).setup({}, { emit() {} })
+  control.changePreviewSource('original')
+  assert.equal(first.currentPreviewSource, 'original')
+  assert.equal(second.currentPreviewSource, 'original')
+  assert.equal(editing.currentPreviewSource, 'modified')
+  assert.equal(editing.currentViewMode, 'edit')
+  load([]).setup({}, { emit() {} }).changePreviewSource('original')
+})

@@ -59,6 +59,7 @@ export type VmoMonacoEditorExpose = {
 export type VmoMonacoDiffEditorExpose = VmoMonacoEditorExpose & {
   currentEditMode: VmoMonacoDiffEditMode
   changeEditMode: (mode: VmoMonacoDiffEditMode) => void
+  hasContentChanges: boolean
   changePreviewSource: (source: VmoMonacoPreviewSource) => void
   currentDiffViewMode: 'side-by-side' | 'inline'
   diffPending?: boolean
